@@ -6,6 +6,7 @@ import { getResearch, ResearchResult, StageEvent, StageKey, subscribeToEvents } 
 import ReportView from "../../components/report-view";
 import ShareButton from "../../components/share-button";
 import StageProgress from "../../components/stage-progress";
+import SiteHeader from "../../components/site-header";
 import { getAccessToken } from "../../../lib/supabase";
 
 export default function RunPage({ params }: { params: Promise<{ runId: string }> }) {
@@ -37,7 +38,7 @@ export default function RunPage({ params }: { params: Promise<{ runId: string }>
     return () => { active = false; unsubscribe(); };
   }, [runId]);
 
-  if (error && (result?.status === "failed" || result?.status === "limited" || !result)) return <main className="shell"><header className="header"><Link className="wordmark" href="/">DeepScout</Link></header><div className="state"><h1>{result?.status === "limited" ? "Research limit reached" : "Research run failed"}</h1><p className="error">{error}</p><Link className="primary link-button" href="/">Try again</Link></div></main>;
-  if (result?.status === "completed" && result.report) return <main className="shell"><header className="header"><Link className="wordmark" href="/">DeepScout</Link><nav className="header-actions"><ShareButton /><Link className="nav-link" href="/">New research</Link></nav></header><ReportView report={result.report} sources={result.sources} /></main>;
-  return <main className="shell"><header className="header"><Link className="wordmark" href="/">DeepScout</Link></header><section className="state" aria-live="polite"><div className="eyebrow">Researching</div><h1>Reading the evidence.</h1><p className="progress-status">{connectionState === "reconnecting" ? "Live updates reconnecting…" : "Stage updates are live."}</p><StageProgress stage={stage} data={stageData} /><div className="loading-skeleton" aria-hidden="true"><span /><span /><span /></div></section></main>;
+  if (error && (result?.status === "failed" || result?.status === "limited" || !result)) return <main className="shell"><SiteHeader /><div className="state"><h1>{result?.status === "limited" ? "Research limit reached" : "Research run failed"}</h1><p className="error">{error}</p><Link className="primary link-button" href="/">Try again</Link></div></main>;
+  if (result?.status === "completed" && result.report) return <main className="shell"><SiteHeader actions={<><ShareButton /><Link className="nav-link" href="/">New research</Link></>} /><ReportView report={result.report} sources={result.sources} /></main>;
+  return <main className="shell"><SiteHeader /><section className="state" aria-live="polite"><div className="eyebrow">Researching</div><h1>Reading the evidence.</h1><p className="progress-status">{connectionState === "reconnecting" ? "Live updates reconnecting…" : "Stage updates are live."}</p><StageProgress stage={stage} data={stageData} /><div className="loading-skeleton" aria-hidden="true"><span /><span /><span /></div></section></main>;
 }

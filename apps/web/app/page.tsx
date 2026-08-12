@@ -1,17 +1,11 @@
-import Link from "next/link";
 import ResearchComposer from "./components/research-composer";
 import AuthPanel from "./components/auth-panel";
+import SiteHeader from "./components/site-header";
 
 export default function HomePage() {
   return (
     <main className="shell">
-      <header className="header">
-        <Link className="wordmark" href="/">DeepScout</Link>
-        <nav className="nav" aria-label="Primary navigation">
-          <Link href="/history">History</Link>
-          <Link href="/about">About</Link>
-        </nav>
-      </header>
+      <SiteHeader />
       <section className="hero">
         <div className="eyebrow">Research with evidence</div>
         <h1>Ask a focused question. Get a brief you can inspect.</h1>
