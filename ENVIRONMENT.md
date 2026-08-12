@@ -1,0 +1,76 @@
+# Environment Variables
+
+Use this as the basis for `.env.example`.
+
+```dotenv
+# App
+APP_ENV=development
+APP_VERSION=0.1.0
+FRONTEND_ORIGIN=http://localhost:3000
+API_PUBLIC_URL=http://localhost:8000
+
+# Database
+DATABASE_URL=
+SUPABASE_URL=
+SUPABASE_ANON_KEY=
+SUPABASE_SERVICE_ROLE_KEY=
+
+# LLM primary
+LLM_PROVIDER=groq
+LLM_API_KEY=
+LLM_MODEL=
+LLM_TIMEOUT_SECONDS=25
+
+# LLM fallback
+LLM_FALLBACK_ENABLED=true
+LLM_FALLBACK_PROVIDER=openrouter
+LLM_FALLBACK_API_KEY=
+LLM_FALLBACK_MODEL=
+
+# Search
+SEARCH_PROVIDER=
+SEARCH_API_KEY=
+SEARCH_TIMEOUT_SECONDS=10
+
+# Identity / abuse controls
+ANON_ID_HMAC_SECRET=
+ANON_RUNS_PER_DAY=5
+AUTH_RUNS_PER_DAY=15
+ANON_CONCURRENT_RUNS=1
+AUTH_CONCURRENT_RUNS=2
+HTTP_REQUESTS_PER_MINUTE_ANON=10
+HTTP_REQUESTS_PER_MINUTE_AUTH=30
+
+# Run budgets
+MAX_QUESTION_CHARS=1500
+MAX_SEARCH_QUERIES=3
+MAX_SEARCH_RESULTS_PER_QUERY=5
+MAX_FETCHED_PAGES=6
+MAX_FETCH_BYTES=3000000
+FETCH_TIMEOUT_SECONDS=8
+FETCH_CONCURRENCY=3
+MAX_EXTRACTED_CHARS_PER_SOURCE=12000
+MAX_TOTAL_CONTEXT_CHARS=50000
+MAX_LLM_CALLS_PER_RUN=3
+MAX_INPUT_TOKENS_PER_RUN=18000
+MAX_OUTPUT_TOKENS_PER_RUN=2500
+
+# Logging
+LOG_LEVEL=INFO
+LOG_FORMAT=json
+STORE_QUESTION_TEXT=false
+
+# Feature flags
+ENABLE_AUTH=false
+ENABLE_HISTORY=true
+ENABLE_FALLBACK_PROVIDER=true
+ENABLE_DEBUG_USAGE=false
+```
+
+## Rules
+
+- `.env` files are ignored by Git.
+- `.env.example` contains no real keys.
+- production secrets are configured in hosting dashboards.
+- fallback provider can be disabled without code changes.
+- all quotas can be reduced immediately if abuse appears.
