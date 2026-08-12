@@ -5,13 +5,13 @@ from datetime import UTC, datetime
 
 from app.config import Settings
 from app.core.errors import INSUFFICIENT_SOURCES, RUN_TIMEOUT, DomainError
-from app.db.repository import InMemoryRunRepository
+from app.db.repository import DocumentRecord, InMemoryRunRepository
 from app.providers.llm.factory import create_llm_provider
 from app.providers.search.factory import create_search_provider
 from app.research.budget import RunBudget
 from app.research.evidence import EvidenceSelector
 from app.research.fetcher import SafeFetcher
-from app.research.models import SearchResult
+from app.research.models import FetchedPage, SearchResult
 from app.research.planner import Planner
 from app.research.quality import SourceQualityClassifier
 from app.research.synthesizer import Synthesizer
@@ -26,7 +26,13 @@ class ResearchOrchestrator:
     def __init__(self, settings: Settings, repository: InMemoryRunRepository) -> None:
         self.settings, self.repository = settings, repository
 
-    async def run(self, run_id: str, question: str, on_stage: StageCallback | None = None) -> None:
+    async def run(
+        self,
+        run_id: str,
+        question: str,
+        documents: list[DocumentRecord] | None = None,
+        on_stage: StageCallback | None = None,
+    ) -> None:
         budget = RunBudget(
             self.settings.max_llm_calls_per_run,
             self.settings.max_input_tokens_per_run,
@@ -85,6 +91,17 @@ class ResearchOrchestrator:
             pages = await SafeFetcher(self.settings).fetch_many(
                 unique_results, self.settings.max_fetched_pages
             )
+            for document in documents or []:
+                pages.append(
+                    FetchedPage(
+                        url=f"local://document/{document.id}",
+                        title=document.filename,
+                        text=document.extracted_text,
+                        domain="uploaded PDF",
+                        status_code=200,
+                        content_type="application/pdf",
+                    )
+                )
             await self.repository.set_fetch_counts(run_id, len(unique_results[: self.settings.max_fetched_pages]), len(pages))
             if len(pages) < 1:
                 raise DomainError(

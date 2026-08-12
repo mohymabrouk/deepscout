@@ -28,10 +28,19 @@ def _result(record) -> ResearchResult:
     )
 
 
-async def _execute(request: Request, run_id: str, question: str, identity_key: str) -> None:
+async def _execute(
+    request: Request,
+    run_id: str,
+    question: str,
+    identity_key: str,
+    document_ids: list[str],
+) -> None:
     try:
+        documents = await request.app.state.repository.get_owned_documents(
+            document_ids, identity_key, request.state.user_id
+        )
         await asyncio.wait_for(
-            request.app.state.orchestrator.run(run_id, question),
+            request.app.state.orchestrator.run(run_id, question, documents=documents),
             request.app.state.settings.max_run_seconds,
         )
     except TimeoutError:
@@ -75,6 +84,17 @@ async def create_research(
     request_hash = hashlib.sha256(
         json.dumps(body.model_dump(mode="json"), sort_keys=True, separators=(",", ":")).encode()
     ).hexdigest()
+    if len(body.document_ids) > request.app.state.settings.max_documents_per_run:
+        raise DomainError(
+            "DOCUMENT_LIMIT_EXCEEDED",
+            "The research run exceeds the configured document limit.",
+            400,
+        )
+    documents = await request.app.state.repository.get_owned_documents(
+        body.document_ids, identity_key, request.state.user_id
+    )
+    if len(documents) != len(body.document_ids):
+        raise DomainError("DOCUMENT_NOT_FOUND", "One or more uploaded documents were not found.", 404)
     stored_question = body.question if request.app.state.settings.store_question_text else None
     await request.app.state.quota_service.reserve_run(
         identity_key,
@@ -104,7 +124,9 @@ async def create_research(
         record = await request.app.state.repository.create(
             stored_question, identity_key, request.state.user_id
         )
-    task = asyncio.create_task(_execute(request, record.id, body.question, identity_key))
+    task = asyncio.create_task(
+        _execute(request, record.id, body.question, identity_key, body.document_ids)
+    )
     request.app.state.tasks.add(task)
     request.app.state.run_tasks[record.id] = task
     return ResearchAccepted(

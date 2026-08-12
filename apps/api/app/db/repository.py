@@ -43,9 +43,22 @@ class RunRecord:
         self.metrics = RunMetrics(started_at=self.created_at)
 
 
+@dataclass(frozen=True)
+class DocumentRecord:
+    id: str
+    filename: str
+    extracted_text: str
+    page_count: int
+    content_hash: str
+    identity_key: str
+    user_id: str | None = None
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+
+
 class InMemoryRunRepository:
     def __init__(self) -> None:
         self._runs: dict[str, RunRecord] = {}
+        self._documents: dict[str, DocumentRecord] = {}
         self._idempotency: dict[tuple[str, str], tuple[str, str]] = {}
         self._lock = asyncio.Lock()
 
@@ -226,6 +239,44 @@ class InMemoryRunRepository:
 
     async def ready(self) -> bool:
         return True
+
+    async def create_document(
+        self,
+        filename: str,
+        extracted_text: str,
+        page_count: int,
+        content_hash: str,
+        identity_key: str,
+        user_id: str | None = None,
+    ) -> DocumentRecord:
+        document = DocumentRecord(
+            id=str(uuid4()),
+            filename=filename,
+            extracted_text=extracted_text,
+            page_count=page_count,
+            content_hash=content_hash,
+            identity_key=identity_key,
+            user_id=user_id,
+        )
+        async with self._lock:
+            self._documents[document.id] = document
+        return document
+
+    async def get_owned_documents(
+        self, document_ids: list[str], identity_key: str, user_id: str | None
+    ) -> list[DocumentRecord]:
+        async with self._lock:
+            documents = [self._documents.get(document_id) for document_id in document_ids]
+            if any(document is None for document in documents):
+                return []
+            owned = [document for document in documents if document and self._owns_document(document, identity_key, user_id)]
+            return owned if len(owned) == len(document_ids) else []
+
+    @staticmethod
+    def _owns_document(document: DocumentRecord, identity_key: str, user_id: str | None) -> bool:
+        if user_id is not None:
+            return document.user_id == user_id
+        return document.user_id is None and document.identity_key == identity_key
 
     async def recover_incomplete_runs(self) -> None:
         async with self._lock:

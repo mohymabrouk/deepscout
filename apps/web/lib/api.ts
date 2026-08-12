@@ -49,11 +49,22 @@ async function responsePayload(response: Response) {
   return payload;
 }
 
-export async function startResearch(question: string, idempotencyKey: string, accessToken?: string | null) {
+export async function uploadDocument(file: File, accessToken?: string | null) {
+  const body = new FormData();
+  body.append("file", file);
+  const response = await fetch(`${apiBase}/v1/documents`, {
+    method: "POST",
+    headers: headers(accessToken),
+    body,
+  });
+  return responsePayload(response) as Promise<{ id: string; filename: string; page_count: number; character_count: number }>;
+}
+
+export async function startResearch(question: string, idempotencyKey: string, accessToken?: string | null, documentIds: string[] = []) {
   const response = await fetch(`${apiBase}/v1/research`, {
     method: "POST",
     headers: { "Content-Type": "application/json", "Idempotency-Key": idempotencyKey, ...headers(accessToken) },
-    body: JSON.stringify({ question, mode: "standard" }),
+    body: JSON.stringify({ question, mode: "standard", document_ids: documentIds }),
   });
   const payload = await responsePayload(response);
   return payload as { run_id: string; status: string; events_url: string };

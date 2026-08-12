@@ -11,6 +11,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
+from app.api.routes.documents import router as documents_router
 from app.api.routes.health import router as health_router
 from app.api.routes.research import router as research_router
 from app.api.routes.runs import router as runs_router
@@ -84,7 +85,12 @@ def create_app() -> FastAPI:
         content_length = request.headers.get("content-length")
         if content_length is not None:
             try:
-                oversized = int(content_length) > settings.max_request_bytes
+                request_limit = (
+                    settings.max_document_bytes + 64_000
+                    if request.url.path == "/v1/documents"
+                    else settings.max_request_bytes
+                )
+                oversized = int(content_length) > request_limit
             except ValueError:
                 oversized = True
             if oversized:
@@ -191,6 +197,7 @@ def create_app() -> FastAPI:
         )
 
     app.include_router(health_router)
+    app.include_router(documents_router)
     app.include_router(research_router)
     app.include_router(runs_router)
     app.include_router(usage_router)

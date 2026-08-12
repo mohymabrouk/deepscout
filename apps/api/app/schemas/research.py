@@ -1,5 +1,6 @@
 from datetime import datetime
 from typing import Literal
+from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -22,6 +23,7 @@ class ResearchRequest(BaseModel):
 
     question: str = Field(min_length=1, max_length=1500)
     mode: Literal["standard"] = "standard"
+    document_ids: list[str] = Field(default_factory=list, max_length=3)
 
     @field_validator("question")
     @classmethod
@@ -33,11 +35,28 @@ class ResearchRequest(BaseModel):
             raise ValueError("Question contains an unsupported control character.")
         return value
 
+    @field_validator("document_ids")
+    @classmethod
+    def validate_document_ids(cls, value: list[str]) -> list[str]:
+        if len(set(value)) != len(value):
+            raise ValueError("document_ids must not contain duplicates.")
+        try:
+            return [str(UUID(item)) for item in value]
+        except (ValueError, AttributeError) as exc:
+            raise ValueError("document_ids must contain valid document IDs.") from exc
+
 
 class ResearchAccepted(BaseModel):
     run_id: str
     status: RunStatus
     events_url: str
+
+
+class DocumentAccepted(BaseModel):
+    id: str
+    filename: str
+    page_count: int
+    character_count: int
 
 
 QualityLabel = Literal["high", "medium", "low"]

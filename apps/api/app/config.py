@@ -58,6 +58,10 @@ class Settings(BaseSettings):
     max_output_tokens_per_run: int = Field(default=2_500, ge=1)
     max_run_seconds: float = Field(default=60.0, gt=0)
     max_request_bytes: int = Field(default=64_000, ge=1024)
+    max_document_bytes: int = Field(default=10_000_000, ge=1024)
+    max_document_pages: int = Field(default=50, ge=1)
+    max_document_chars: int = Field(default=100_000, ge=100)
+    max_documents_per_run: int = Field(default=3, ge=1, le=10)
 
     log_level: str = "INFO"
     store_question_text: bool = False

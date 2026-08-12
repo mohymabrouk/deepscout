@@ -7,7 +7,7 @@ from typing import Any
 from uuid import UUID, uuid4
 
 from app.core.errors import IDEMPOTENCY_CONFLICT, DomainError
-from app.db.repository import RunRecord
+from app.db.repository import DocumentRecord, RunRecord
 from app.research.models import EvidencePassage, RunMetrics, StageTiming
 from app.schemas.events import RunEvent
 from app.schemas.research import ResearchReport, Source, SourceQuality, Usage
@@ -68,6 +68,92 @@ class PostgresRunRepository:
                         """,
                         [(row["id"], '{"code":"API_RESTARTED"}') for row in rows],
                     )
+
+    async def create_document(
+        self,
+        filename: str,
+        extracted_text: str,
+        page_count: int,
+        content_hash: str,
+        identity_key: str,
+        user_id: str | None = None,
+    ) -> DocumentRecord:
+        pool = await self._get_pool()
+        document_id = uuid4()
+        async with pool.acquire() as connection:
+            row = await connection.fetchrow(
+                """
+                insert into user_documents
+                    (id, user_id, anonymous_key, filename, extracted_text, page_count, content_hash)
+                values ($1, $2, $3, $4, $5, $6, $7)
+                returning *
+                """,
+                document_id,
+                UUID(user_id) if user_id else None,
+                identity_key if user_id is None else None,
+                filename,
+                extracted_text,
+                page_count,
+                content_hash,
+            )
+        return DocumentRecord(
+            id=str(row["id"]),
+            filename=row["filename"],
+            extracted_text=row["extracted_text"],
+            page_count=row["page_count"],
+            content_hash=row["content_hash"],
+            identity_key=row["anonymous_key"] or "",
+            user_id=str(row["user_id"]) if row["user_id"] else None,
+            created_at=row["created_at"],
+        )
+
+    async def get_owned_documents(
+        self, document_ids: list[str], identity_key: str, user_id: str | None
+    ) -> list[DocumentRecord]:
+        if not document_ids:
+            return []
+        parsed_ids: list[UUID] = []
+        try:
+            parsed_ids = [UUID(document_id) for document_id in document_ids]
+        except ValueError:
+            return []
+        pool = await self._get_pool()
+        async with pool.acquire() as connection:
+            if user_id:
+                rows = await connection.fetch(
+                    """
+                    select * from user_documents
+                    where id = any($1::uuid[]) and user_id = $2
+                    order by array_position($1::uuid[], id)
+                    """,
+                    parsed_ids,
+                    UUID(user_id),
+                )
+            else:
+                rows = await connection.fetch(
+                    """
+                    select * from user_documents
+                    where id = any($1::uuid[]) and user_id is null and anonymous_key = $2
+                    order by array_position($1::uuid[], id)
+                    """,
+                    parsed_ids,
+                    identity_key,
+                )
+        if len(rows) != len(parsed_ids):
+            return []
+        return [
+            DocumentRecord(
+                id=str(row["id"]),
+                filename=row["filename"],
+                extracted_text=row["extracted_text"],
+                page_count=row["page_count"],
+                content_hash=row["content_hash"],
+                identity_key=row["anonymous_key"] or "",
+                user_id=str(row["user_id"]) if row["user_id"] else None,
+                created_at=row["created_at"],
+            )
+            for row in rows
+        ]
 
     @staticmethod
     def _run_uuid(run_id: str) -> UUID | None:
