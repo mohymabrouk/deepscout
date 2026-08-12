@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     anon_id_hmac_secret: str = Field(default="local-development-secret", min_length=16)
     supabase_url: str | None = None
     supabase_jwt_secret: str | None = None
+    supabase_jwt_jwks_url: str | None = None
     supabase_jwt_audience: str = "authenticated"
     enable_auth: bool = False
     enable_history: bool = True
@@ -74,6 +75,9 @@ class Settings(BaseSettings):
                 raise ValueError("A production LLM provider and API key are required.")
             if self.search_provider == "demo" or not self.search_api_key:
                 raise ValueError("A production search provider and API key are required.")
+        if self.enable_auth and not self.supabase_jwt_secret and not self.supabase_jwt_jwks_url:
+            if not self.supabase_url:
+                raise ValueError("SUPABASE_URL or a Supabase JWT verification key is required.")
         return self
 
 
