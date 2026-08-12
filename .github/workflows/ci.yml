@@ -15,6 +15,7 @@ jobs:
       - run: python -m pip install -r apps/api/requirements.txt pytest ruff
       - run: ruff check apps/api
       - run: pytest
+      - run: python evals/run_eval.py --cases evals/cases.jsonl --output /tmp/deepscout-eval.json --baseline evals/baselines/demo.json --fail-on-regression
 
   web:
     runs-on: ubuntu-latest

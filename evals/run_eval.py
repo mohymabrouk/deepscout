@@ -14,7 +14,21 @@ sys.path.insert(0, str(API_ROOT))
 from app.config import Settings  # noqa: E402
 from app.db.repository import InMemoryRunRepository  # noqa: E402
 from app.research.orchestrator import ResearchOrchestrator  # noqa: E402
-from metrics import EvaluationCase, aggregate_metrics, evaluate_case, regression_gate  # noqa: E402
+
+try:
+    from .metrics import (  # noqa: E402
+        EvaluationCase,
+        aggregate_metrics,
+        evaluate_case,
+        regression_gate,
+    )
+except ImportError:
+    from metrics import (  # noqa: E402
+        EvaluationCase,
+        aggregate_metrics,
+        evaluate_case,
+        regression_gate,
+    )
 
 
 def load_cases(path: Path) -> list[EvaluationCase]:
@@ -99,4 +113,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-
