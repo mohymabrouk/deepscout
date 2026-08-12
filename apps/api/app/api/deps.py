@@ -16,4 +16,3 @@ def get_repository(request: Request) -> InMemoryRunRepository:
 
 async def request_id(request: Request) -> AsyncIterator[str]:
     yield request.state.request_id
-

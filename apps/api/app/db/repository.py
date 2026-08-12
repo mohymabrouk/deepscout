@@ -9,12 +9,10 @@ from __future__ import annotations
 import asyncio
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from typing import Any
 from uuid import uuid4
 
 from app.schemas.events import RunEvent
 from app.schemas.research import ResearchReport, Source, Usage
-
 
 TERMINAL_STATUSES = {"completed", "failed", "limited"}
 
@@ -56,7 +54,9 @@ class InMemoryRunRepository:
         async with self._lock:
             self._runs[run_id].events.append(event)
 
-    async def complete(self, run_id: str, report: ResearchReport, sources: list[Source], usage: Usage) -> None:
+    async def complete(
+        self, run_id: str, report: ResearchReport, sources: list[Source], usage: Usage
+    ) -> None:
         async with self._lock:
             run = self._runs[run_id]
             run.status = "completed"
@@ -76,4 +76,3 @@ class InMemoryRunRepository:
     async def all_for_identity(self, identity_key: str) -> list[RunRecord]:
         async with self._lock:
             return [run for run in self._runs.values() if run.identity_key == identity_key]
-

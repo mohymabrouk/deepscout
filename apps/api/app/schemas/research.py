@@ -60,7 +60,18 @@ class Usage(BaseModel):
 
 class ResearchResult(BaseModel):
     id: str
-    status: Literal["pending", "planning", "searching", "fetching", "synthesizing", "verifying", "completed", "failed", "limited"]
+    status: Literal[
+        "pending",
+        "planning",
+        "searching",
+        "fetching",
+        "selecting",
+        "synthesizing",
+        "verifying",
+        "completed",
+        "failed",
+        "limited",
+    ]
     question: str | None = None
     report: ResearchReport | None = None
     sources: list[Source] = Field(default_factory=list)
@@ -75,4 +86,3 @@ class UsageResponse(BaseModel):
     input_tokens_used: int
     input_tokens_limit: int
     resets_at: datetime
-

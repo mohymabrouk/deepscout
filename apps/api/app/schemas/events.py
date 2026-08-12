@@ -8,4 +8,3 @@ class RunEvent(BaseModel):
     stage: str | None = None
     message: str | None = None
     data: dict[str, Any] = Field(default_factory=dict)
-

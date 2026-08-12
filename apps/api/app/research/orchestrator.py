@@ -1,0 +1,131 @@
+from __future__ import annotations
+
+from collections.abc import Awaitable, Callable
+
+from app.config import Settings
+from app.core.errors import INSUFFICIENT_SOURCES, RUN_TIMEOUT, DomainError
+from app.db.repository import InMemoryRunRepository
+from app.providers.llm.factory import create_llm_provider
+from app.providers.search.factory import create_search_provider
+from app.research.budget import RunBudget
+from app.research.evidence import EvidenceSelector
+from app.research.fetcher import SafeFetcher
+from app.research.models import SearchResult
+from app.research.planner import Planner
+from app.research.synthesizer import Synthesizer
+from app.research.verifier import CitationVerifier
+from app.schemas.events import RunEvent
+from app.schemas.research import Source, Usage
+
+StageCallback = Callable[[str, str, dict], Awaitable[None]]
+
+
+class ResearchOrchestrator:
+    def __init__(self, settings: Settings, repository: InMemoryRunRepository) -> None:
+        self.settings, self.repository = settings, repository
+
+    async def run(self, run_id: str, question: str, on_stage: StageCallback | None = None) -> None:
+        budget = RunBudget(
+            self.settings.max_llm_calls_per_run,
+            self.settings.max_input_tokens_per_run,
+            self.settings.max_output_tokens_per_run,
+        )
+
+        async def stage(name: str, message: str, data: dict | None = None) -> None:
+            await self.repository.update_status(run_id, name)
+            await self.repository.append_event(
+                run_id, RunEvent(event="stage", stage=name, message=message, data=data or {})
+            )
+            if on_stage:
+                await on_stage(name, message, data or {})
+
+        try:
+            provider = create_llm_provider(self.settings)
+            search_provider = create_search_provider(self.settings)
+            await stage("planning", "Planning search")
+            plan = await Planner(provider, budget, self.settings.max_search_queries).plan(question)
+            await stage("searching", "Searching sources")
+            search_results: list[SearchResult] = []
+            for query in plan.queries:
+                search_results.extend(
+                    await search_provider.search(query, self.settings.max_search_results_per_query)
+                )
+            unique_results = list({result.url: result for result in search_results}.values())
+            await self.repository.append_event(
+                run_id,
+                RunEvent(
+                    event="stage",
+                    stage="searching",
+                    message="Searching sources",
+                    data={"sources_found": len(unique_results)},
+                ),
+            )
+            await stage(
+                "fetching",
+                "Reading sources",
+                {"total": min(len(unique_results), self.settings.max_fetched_pages)},
+            )
+            pages = await SafeFetcher(self.settings).fetch_many(
+                unique_results, self.settings.max_fetched_pages
+            )
+            if len(pages) < 1:
+                raise DomainError(
+                    INSUFFICIENT_SOURCES, "Not enough usable sources were retrieved.", 502
+                )
+            await stage(
+                "fetching",
+                "Reading sources",
+                {
+                    "completed": len(pages),
+                    "total": min(len(unique_results), self.settings.max_fetched_pages),
+                },
+            )
+            await stage("selecting", "Selecting evidence")
+            evidence = EvidenceSelector(
+                self.settings.max_total_context_chars, min(6, self.settings.max_fetched_pages)
+            ).select(question, pages, plan.must_cover)
+            if not evidence:
+                raise DomainError(
+                    INSUFFICIENT_SOURCES, "Not enough relevant evidence was retrieved.", 502
+                )
+            await stage("synthesizing", "Writing report")
+            report = await Synthesizer(provider, budget).synthesize(question, evidence)
+            await stage("verifying", "Verifying citations")
+            report, _ = CitationVerifier().verify(report, evidence)
+            sources = [
+                Source(
+                    citation_id=index,
+                    title=item.source.title,
+                    url=item.source.url,
+                    domain=item.source.domain,
+                    retrieved_at=item.source.retrieved_at,
+                )
+                for index, item in enumerate(evidence, start=1)
+            ]
+            input_tokens, output_tokens, llm_calls = budget.usage()
+            await self.repository.complete(
+                run_id,
+                report,
+                sources,
+                Usage(input_tokens=input_tokens, output_tokens=output_tokens, llm_calls=llm_calls),
+            )
+            await self.repository.append_event(
+                run_id, RunEvent(event="complete", data={"run_id": run_id, "status": "completed"})
+            )
+        except TimeoutError:
+            await self.repository.fail(run_id, "failed", RUN_TIMEOUT)
+            await self.repository.append_event(
+                run_id, RunEvent(event="error", data={"code": RUN_TIMEOUT})
+            )
+        except DomainError as exc:
+            await self.repository.fail(
+                run_id, "limited" if exc.code == "TOKEN_BUDGET_EXCEEDED" else "failed", exc.code
+            )
+            await self.repository.append_event(
+                run_id, RunEvent(event="error", data={"code": exc.code, "message": exc.message})
+            )
+        except Exception:
+            await self.repository.fail(run_id, "failed", "INTERNAL_ERROR")
+            await self.repository.append_event(
+                run_id, RunEvent(event="error", data={"code": "INTERNAL_ERROR"})
+            )

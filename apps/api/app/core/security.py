@@ -41,11 +41,12 @@ def validate_fetch_url(url: str) -> str:
     if hostname in {"localhost", "metadata.google.internal"}:
         raise DomainError("INVALID_REQUEST", "Private network URLs are not fetchable.", 400)
     try:
-        if not is_public_ip(hostname):
-            # Hostnames are resolved by the fetcher and checked before connection.
-            if "." not in hostname:
-                raise DomainError("INVALID_REQUEST", "Private network URLs are not fetchable.", 400)
+        address = ipaddress.ip_address(hostname)
     except ValueError:
-        raise DomainError("INVALID_REQUEST", "Invalid fetch URL.", 400) from None
+        # Hostnames are resolved by the fetcher and checked before connection.
+        if "." not in hostname:
+            raise DomainError("INVALID_REQUEST", "Private network URLs are not fetchable.", 400)
+    else:
+        if not is_public_ip(str(address)):
+            raise DomainError("INVALID_REQUEST", "Private network URLs are not fetchable.", 400)
     return parsed._replace(fragment="").geturl()
-

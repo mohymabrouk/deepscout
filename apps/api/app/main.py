@@ -12,6 +12,7 @@ from app.api.routes.usage import router as usage_router
 from app.config import get_settings
 from app.core.errors import DomainError
 from app.db.repository import InMemoryRunRepository
+from app.research.orchestrator import ResearchOrchestrator
 
 
 def create_app() -> FastAPI:
@@ -19,6 +20,8 @@ def create_app() -> FastAPI:
     app = FastAPI(title="DeepScout API", version=settings.app_version)
     app.state.settings = settings
     app.state.repository = InMemoryRunRepository()
+    app.state.orchestrator = ResearchOrchestrator(settings, app.state.repository)
+    app.state.tasks = set()
     app.add_middleware(
         CORSMiddleware,
         allow_origins=[settings.frontend_origin],
@@ -58,4 +61,3 @@ def create_app() -> FastAPI:
 
 
 app = create_app()
-
