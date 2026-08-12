@@ -8,6 +8,7 @@ from fastapi import APIRouter, Header, Request
 from fastapi.responses import StreamingResponse
 
 from app.core.errors import RUN_NOT_FOUND, RUN_TIMEOUT, DomainError
+from app.core.security import request_identity
 from app.db.repository import TERMINAL_STATUSES
 from app.schemas.events import RunEvent
 from app.schemas.research import ResearchAccepted, ResearchRequest, ResearchResult
@@ -27,7 +28,7 @@ def _result(record) -> ResearchResult:
     )
 
 
-async def _execute(request: Request, run_id: str, question: str) -> None:
+async def _execute(request: Request, run_id: str, question: str, identity_key: str) -> None:
     try:
         await asyncio.wait_for(
             request.app.state.orchestrator.run(run_id, question),
@@ -39,6 +40,14 @@ async def _execute(request: Request, run_id: str, question: str) -> None:
             run_id, RunEvent(event="error", data={"code": RUN_TIMEOUT})
         )
     finally:
+        record = await request.app.state.repository.get(run_id)
+        usage = record.usage if record else None
+        await request.app.state.quota_service.finish_run(
+            identity_key,
+            usage.input_tokens if usage else 0,
+            usage.output_tokens if usage else 0,
+            usage.llm_calls if usage else 0,
+        )
         request.app.state.tasks.discard(asyncio.current_task())
 
 
@@ -52,8 +61,10 @@ async def create_research(
         raise DomainError(
             "QUESTION_TOO_LONG", "Question exceeds the configured character limit.", 400
         )
-    identity_key = request.headers.get(
-        "Authorization", "anon:" + (request.client.host if request.client else "unknown")
+    identity_key, authenticated = request_identity(
+        request.headers.get("Authorization"),
+        request.client.host if request.client else "unknown",
+        request.app.state.settings.anon_id_hmac_secret,
     )
     if idempotency_key:
         existing = getattr(request.app.state, "idempotency", {}).get(
@@ -63,12 +74,17 @@ async def create_research(
             return ResearchAccepted(
                 run_id=existing, status="pending", events_url=f"/v1/research/{existing}/events"
             )
+    await request.app.state.quota_service.reserve_run(
+        identity_key,
+        request.app.state.settings.auth_runs_per_day if authenticated else request.app.state.settings.anon_runs_per_day,
+        request.app.state.settings.auth_concurrent_runs if authenticated else request.app.state.settings.anon_concurrent_runs,
+    )
     record = await request.app.state.repository.create(body.question, identity_key)
     if not hasattr(request.app.state, "idempotency"):
         request.app.state.idempotency = {}
     if idempotency_key:
         request.app.state.idempotency[(identity_key, idempotency_key)] = record.id
-    task = asyncio.create_task(_execute(request, record.id, body.question))
+    task = asyncio.create_task(_execute(request, record.id, body.question, identity_key))
     request.app.state.tasks.add(task)
     return ResearchAccepted(
         run_id=record.id, status="pending", events_url=f"/v1/research/{record.id}/events"

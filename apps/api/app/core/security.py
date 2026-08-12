@@ -18,6 +18,14 @@ def anonymous_identity(raw_ip: str, secret: str) -> str:
     return "anon_" + hmac.new(secret.encode(), normalized.encode(), hashlib.sha256).hexdigest()
 
 
+def request_identity(authorization: str | None, raw_ip: str, secret: str) -> tuple[str, bool]:
+    """Resolve identity without storing raw IPs, bearer tokens, or authorization headers."""
+    if authorization and authorization.lower().startswith("bearer "):
+        token = authorization[7:].strip().encode()
+        return "user_" + hashlib.sha256(token).hexdigest(), True
+    return anonymous_identity(raw_ip, secret), False
+
+
 def is_public_ip(value: str) -> bool:
     try:
         address = ipaddress.ip_address(value)
