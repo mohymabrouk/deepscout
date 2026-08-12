@@ -12,7 +12,7 @@ from app.api.routes.health import router as health_router
 from app.api.routes.research import router as research_router
 from app.api.routes.usage import router as usage_router
 from app.config import get_settings
-from app.core.errors import DomainError
+from app.core.errors import HTTP_RATE_LIMIT, DomainError
 from app.core.rate_limit import FixedWindowRateLimiter, RunQuotaService
 from app.core.security import request_identity
 from app.db.repository import InMemoryRunRepository
@@ -51,7 +51,7 @@ def create_app() -> FastAPI:
             if not allowed:
                 response = JSONResponse(
                     status_code=429,
-                    content={"error": {"code": "CONCURRENCY_LIMIT", "message": "Too many API requests. Please retry shortly.", "request_id": request.state.request_id, "retry_after_seconds": reset}},
+                    content={"error": {"code": HTTP_RATE_LIMIT, "message": "Too many API requests. Please retry shortly.", "request_id": request.state.request_id, "retry_after_seconds": reset}},
                 )
                 response.headers["Retry-After"] = str(reset)
                 response.headers["X-RateLimit-Limit"] = str(limit)

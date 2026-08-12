@@ -50,6 +50,7 @@ class ResearchOrchestrator:
                 search_results.extend(
                     await search_provider.search(query, self.settings.max_search_results_per_query)
                 )
+                await self.repository.increment_search_calls(run_id)
             unique_results = list({result.url: result for result in search_results}.values())
             await self.repository.append_event(
                 run_id,

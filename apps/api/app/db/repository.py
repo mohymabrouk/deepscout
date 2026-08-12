@@ -26,6 +26,7 @@ class RunRecord:
     report: ResearchReport | None = None
     sources: list[Source] = field(default_factory=list)
     usage: Usage | None = None
+    search_calls: int = 0
     error_code: str | None = None
     events: list[RunEvent] = field(default_factory=list)
     created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
@@ -63,6 +64,10 @@ class InMemoryRunRepository:
             run.report = report
             run.sources = sources
             run.usage = usage
+
+    async def increment_search_calls(self, run_id: str) -> None:
+        async with self._lock:
+            self._runs[run_id].search_calls += 1
 
     async def fail(self, run_id: str, status: str, error_code: str) -> None:
         async with self._lock:

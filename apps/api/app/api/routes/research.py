@@ -47,6 +47,7 @@ async def _execute(request: Request, run_id: str, question: str, identity_key: s
             usage.input_tokens if usage else 0,
             usage.output_tokens if usage else 0,
             usage.llm_calls if usage else 0,
+            record.search_calls if record else 0,
         )
         request.app.state.tasks.discard(asyncio.current_task())
 

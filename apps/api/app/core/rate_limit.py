@@ -103,4 +103,3 @@ class RunQuotaService:
         now = datetime.now(UTC)
         tomorrow = datetime.combine(now.date() + timedelta(days=1), datetime.min.time(), tzinfo=UTC)
         return max(1, int((tomorrow - now).total_seconds()))
-
