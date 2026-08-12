@@ -9,7 +9,7 @@ from uuid import UUID, uuid4
 from app.db.repository import RunRecord
 from app.research.models import RunMetrics, StageTiming
 from app.schemas.events import RunEvent
-from app.schemas.research import ResearchReport, Source, Usage
+from app.schemas.research import ResearchReport, Source, SourceQuality, Usage
 
 
 class PostgresRunRepository:
@@ -110,7 +110,8 @@ class PostgresRunRepository:
         async with pool.acquire() as connection:
             source_rows = await connection.fetch(
                 """
-                select citation_id, title, url, domain, fetched_at
+                select citation_id, title, url, domain, fetched_at,
+                    quality_score, quality_label, quality_reasons
                 from sources where run_id = $1 order by citation_id asc nulls last
                 """,
                 row["id"],
@@ -129,6 +130,11 @@ class PostgresRunRepository:
                 url=source["url"],
                 domain=source["domain"],
                 retrieved_at=source["fetched_at"] or row["created_at"],
+                quality=SourceQuality(
+                    score=float(source["quality_score"] or 0.5),
+                    label=source["quality_label"] or "medium",
+                    reasons=self._json(source["quality_reasons"] or "[]"),
+                ),
             )
             for source in source_rows
         ]
@@ -230,8 +236,11 @@ class PostgresRunRepository:
                 await connection.execute("delete from sources where run_id = $1", UUID(run_id))
                 await connection.executemany(
                     """
-                    insert into sources (run_id, citation_id, url, canonical_url, domain, title, fetched_at, fetch_status)
-                    values ($1, $2, $3, $3, $4, $5, $6, 'succeeded')
+                    insert into sources (
+                        run_id, citation_id, url, canonical_url, domain, title, fetched_at,
+                        fetch_status, quality_score, quality_label, quality_reasons
+                    )
+                    values ($1, $2, $3, $3, $4, $5, $6, 'succeeded', $7, $8, $9::jsonb)
                     """,
                     [
                         (
@@ -241,6 +250,9 @@ class PostgresRunRepository:
                             source.domain,
                             source.title,
                             source.retrieved_at,
+                            source.quality.score,
+                            source.quality.label,
+                            json.dumps(source.quality.reasons),
                         )
                         for source in sources
                     ],
