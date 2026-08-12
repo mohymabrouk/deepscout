@@ -33,7 +33,7 @@ The checked implementation items below run locally against deterministic demo pr
 - [x] Synthesizer
 - [x] Citation verifier
 - [x] Research orchestrator
-- [ ] Run persistence (in-memory MVP only; SQL migration exists)
+- [x] Run persistence (Postgres repository with local in-memory fallback)
 - [ ] Usage persistence (in-memory MVP only)
 - [x] SSE events
 
@@ -50,7 +50,8 @@ The checked implementation items below run locally against deterministic demo pr
 - [x] Source rail/cards
 - [x] Responsive layout
 - [ ] Accessibility pass (baseline semantics present; full audit remains)
-- [ ] History page
+- [x] Supabase Auth sign-in/sign-up/sign-out
+- [x] History page
 
 ## Phase 3 UX
 
@@ -67,11 +68,11 @@ The checked implementation items below run locally against deterministic demo pr
 - [ ] `research_runs`
 - [ ] `sources`
 - [ ] `evidence_passages`
-- [ ] `run_events`
+- [x] `run_events`
 - [ ] `usage_daily`
-- [ ] indexes
+- [x] indexes
 - [ ] retention policy
-- [ ] ownership/RLS policy
+- [x] ownership policy in FastAPI repository queries (RLS remains optional because the API is the DB boundary)
 
 ## Security
 
@@ -81,7 +82,7 @@ The checked implementation items below run locally against deterministic demo pr
 - [ ] Body-size caps
 - [ ] HTML escaping
 - [ ] Unsafe Markdown HTML disabled
-- [ ] Auth JWT validation
+- [x] Auth JWT validation
 - [ ] Log redaction
 - [ ] Dependency audit
 

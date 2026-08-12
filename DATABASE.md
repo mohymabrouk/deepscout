@@ -75,7 +75,7 @@ For a privacy-minimized demo, consider deleting `extracted_text` and `evidence_p
 
 ## 4. `run_events`
 
-Optional but excellent for debugging.
+Persisted event stream used by the research UI and API diagnostics.
 
 ```sql
 create table run_events (
@@ -124,7 +124,10 @@ If exposing Supabase directly to the frontend for history reads:
 - never allow frontend writes to usage counters;
 - service-role key remains backend-only.
 
-Simpler v1: keep all database access behind FastAPI and use Supabase only as managed Postgres/Auth.
+Phase 5 uses the latter model: the API's Postgres repository applies `user_id` ownership
+predicates and the browser never connects with a service-role credential. Apply
+`infra/sql/002_phase5_auth_history.sql` after the initial schema; it adds persisted event
+streams, metrics JSON, idempotency storage, and the stable history cursor index.
 
 ## 8. Retention
 
