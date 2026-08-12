@@ -51,6 +51,9 @@ create table sources (
   fetch_status text not null,
   http_status integer null,
   content_type text null,
+  quality_score real not null default 0.5,
+  quality_label text not null default 'medium',
+  quality_reasons jsonb not null default '[]'::jsonb,
   extracted_text text null,
   content_hash text null,
   created_at timestamptz not null default now(),
@@ -128,6 +131,9 @@ Phase 5 uses the latter model: the API's Postgres repository applies `user_id` o
 predicates and the browser never connects with a service-role credential. Apply
 `infra/sql/002_phase5_auth_history.sql` after the initial schema; it adds persisted event
 streams, metrics JSON, idempotency storage, and the stable history cursor index.
+
+Apply `infra/sql/003_source_quality.sql` after the Phase 5 migration to add the persisted
+quality score, bounded label, and explainable reason list.
 
 ## 8. Retention
 

@@ -132,7 +132,8 @@ cd apps/web && npm run lint && npm run typecheck && npm run build && npm audit
 
 The API uses an in-memory repository for local/demo execution and automatically selects
 the Postgres repository when `DATABASE_URL` is configured. Apply `infra/sql/001_initial.sql`
-and `infra/sql/002_phase5_auth_history.sql` to a managed Postgres database. To enable
+and `infra/sql/002_phase5_auth_history.sql`, then `infra/sql/003_source_quality.sql`, to a
+managed Postgres database. To enable
 authenticated history, set `ENABLE_AUTH=true`, `SUPABASE_URL`, `SUPABASE_JWT_SECRET`, and
 `SUPABASE_JWT_AUDIENCE=authenticated` in the API environment. Copy the public Supabase URL
 and anon key into `apps/web/.env.local` as `NEXT_PUBLIC_SUPABASE_URL` and
@@ -140,6 +141,8 @@ and anon key into `apps/web/.env.local` as `NEXT_PUBLIC_SUPABASE_URL` and
 
 Authenticated users can revisit runs at `/history`. Result, event, list, and delete
 operations are owner-scoped; anonymous runs remain bound to their anonymous identity.
+Completed reports also expose deterministic source-quality signals with bounded labels and
+reasons. Treat them as review aids, not proof that a source is correct.
 
 ## Deterministic benchmark
 
