@@ -136,14 +136,15 @@ The API currently uses an in-memory repository for local/demo execution. The ini
 
 The Phase 4 smoke evaluation contains 32 cases across technical comparisons, explanations, landscapes, fact checks, recency-sensitive questions, ambiguity, insufficient evidence, provider failures, and retrieval security. It runs against deterministic demo providers and is regression-gated in CI.
 
-| Metric | Demo baseline |
+| Metric | Demo baseline / current |
 |---|---:|
 | Completion rate | 100% |
 | Invalid citation case rate | 0% |
 | Citation coverage | 100% |
 | Citation URL integrity | 100% |
 | Retrieval sufficiency | 100% |
-| Median total tokens | 602.5 |
+| Concept coverage (demo-v1 → demo-v2) | 5.2% → 14.6% (+9.375 pp) |
+| Median total tokens | 650.0 |
 | Median model calls | 2 |
 
 Run details and the regression policy are in [`evals/README.md`](evals/README.md).

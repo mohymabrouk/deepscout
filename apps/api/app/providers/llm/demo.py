@@ -44,15 +44,17 @@ class DemoLLMProvider:
                     "Citations were normalized against fetched sources."
                 )
             else:
+                evidence = re.findall(r"<EVIDENCE>(.*?)</EVIDENCE>", user_content, flags=re.DOTALL)
+                lead_evidence = " ".join(evidence[0].split())[:360] if evidence else "No evidence excerpt was available."
                 payload = {
                     "title": title,
-                    "executive_summary": "The available sources provide a bounded starting point for this question.",
+                    "executive_summary": "The available sources provide a bounded starting point grounded in the retrieved evidence.",
                     "sections": [
                         {
                             "heading": "Key findings",
                             "paragraphs": [
                                 {
-                                    "text": "The retrieved evidence should be weighed by relevance, source quality, and stated limitations.",
+                                    "text": f"The retrieved evidence says: {lead_evidence} Weigh it by relevance, source quality, and stated limitations.",
                                     "citations": citations,
                                 }
                             ],

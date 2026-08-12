@@ -22,3 +22,4 @@ def test_demo_run_records_stage_and_latency_metrics():
         "planning", "searching", "fetching", "selecting", "synthesizing", "verifying"
     }
     assert all(item.duration_ms is not None for item in record.metrics.stage_timings)
+    assert "retrieved evidence says" in record.report.sections[0].paragraphs[0].text.lower()

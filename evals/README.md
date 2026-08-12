@@ -14,9 +14,10 @@ The runner reports per-case and aggregate metrics for completion, latency, token
 
 The checked-in baseline is intentionally tied to the deterministic demo provider. Its latency and token figures are smoke-test measurements, not production capacity claims. Live-provider evaluation should use a separate baseline and explicit credentials outside CI.
 
+The first measured adapter improvement is recorded in [`benchmarks/demo-v2.json`](benchmarks/demo-v2.json): concept coverage increased from 5.2% to 14.6% (+9.375 percentage points), while median total tokens increased 7.88%, below the 20% gate.
+
 Regression gates:
 
 - invalid citation case rate must not increase;
 - completion rate may not fall by more than five percentage points;
 - median total token usage may not increase by more than twenty percent.
-
