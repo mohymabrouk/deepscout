@@ -1,5 +1,17 @@
 # Implementation Roadmap
 
+## Current implementation status
+
+Phase 1 and Phase 2 are implemented in the local MVP:
+
+- `apps/api`: bounded planner → search → safe fetch → extraction → evidence → synthesis → citation verification pipeline;
+- `apps/web`: research composer, stage progress, result report, inline citations, and source cards;
+- Phase 2 controls: HMAC identity keys, burst limits, daily run quotas, concurrency reservations, token budgets, bounded fetches, transient retries, optional LLM fallback, and structured errors;
+- deterministic demo providers allow the full flow and tests to run without paid API keys;
+- `infra/sql/001_initial.sql` is prepared for managed Postgres deployment.
+
+The default local repository is intentionally single-process in-memory so the MVP runs without infrastructure. Postgres repository wiring, auth/history, deployment, and evals remain future hardening work before claiming the production exit criteria.
+
 ## Phase 0 — repository foundation
 
 Deliverables:
