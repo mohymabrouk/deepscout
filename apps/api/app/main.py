@@ -16,6 +16,7 @@ from app.config import get_settings
 from app.core.errors import HTTP_RATE_LIMIT, DomainError
 from app.core.rate_limit import FixedWindowRateLimiter, RunQuotaService
 from app.core.security import anonymous_identity, authenticate_request, authenticated_identity
+from app.db.postgres import PostgresRunRepository
 from app.db.repository import InMemoryRunRepository
 from app.research.orchestrator import ResearchOrchestrator
 
@@ -24,7 +25,11 @@ def create_app() -> FastAPI:
     settings = get_settings()
     app = FastAPI(title="DeepScout API", version=settings.app_version)
     app.state.settings = settings
-    app.state.repository = InMemoryRunRepository()
+    app.state.repository = (
+        PostgresRunRepository(settings.database_url)
+        if settings.database_url
+        else InMemoryRunRepository()
+    )
     app.state.orchestrator = ResearchOrchestrator(settings, app.state.repository)
     app.state.tasks = set()
     app.state.run_tasks = {}
@@ -116,6 +121,13 @@ def create_app() -> FastAPI:
     app.include_router(research_router)
     app.include_router(runs_router)
     app.include_router(usage_router)
+
+    @app.on_event("shutdown")
+    async def close_repository() -> None:
+        close = getattr(app.state.repository, "close", None)
+        if close:
+            await close()
+
     return app
 
 

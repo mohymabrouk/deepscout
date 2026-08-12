@@ -14,8 +14,8 @@ def _summary(record) -> RunSummary:
         id=record.id,
         status=record.status,
         question=record.question,
-        title=record.report.title if record.report else None,
-        source_count=len(record.sources),
+        title=record.title or (record.report.title if record.report else None),
+        source_count=record.source_count or len(record.sources),
         created_at=record.created_at,
         completed_at=record.metrics.completed_at,
     )

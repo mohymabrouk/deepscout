@@ -28,6 +28,8 @@ class RunRecord:
     status: str = "pending"
     report: ResearchReport | None = None
     sources: list[Source] = field(default_factory=list)
+    source_count: int = 0
+    title: str | None = None
     usage: Usage | None = None
     search_calls: int = 0
     error_code: str | None = None
@@ -89,6 +91,8 @@ class InMemoryRunRepository:
             run.status = "completed"
             run.report = report
             run.sources = sources
+            run.source_count = len(sources)
+            run.title = report.title
             run.usage = usage
 
     async def increment_search_calls(self, run_id: str) -> None:
