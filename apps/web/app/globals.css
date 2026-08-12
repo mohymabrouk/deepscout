@@ -31,5 +31,25 @@ h1 { font-size: clamp(42px, 8vw, 76px); letter-spacing: -.065em; line-height: .9
 .examples { color: var(--muted); display: flex; flex-wrap: wrap; font-size: 13px; gap: 12px; margin-top: 22px; }
 .examples button { background: none; border: 0; color: inherit; cursor: pointer; padding: 0; text-align: left; }
 .examples button:hover { color: var(--ink); }
+.state { margin: 15vh auto 0; max-width: 680px; }
+.state h1, .report h1 { font-size: clamp(40px, 7vw, 68px); }
+.progress { border-top: 1px solid var(--border); margin-top: 42px; max-width: 520px; }
+.progress-row { border-bottom: 1px solid var(--border); color: #aaa9a0; display: flex; gap: 14px; padding: 14px 0; }
+.progress-row.current { color: var(--ink); }
+.progress-row.complete { color: var(--muted); }
+.result-grid { display: grid; gap: 72px; grid-template-columns: minmax(0, 1fr) 300px; margin: 72px auto 0; max-width: 1080px; }
+.report { max-width: 760px; }
+.report h1 { margin-bottom: 28px; }
+.report h2, .sources h2 { font-size: 18px; margin-top: 42px; }
+.summary { font-size: 20px; line-height: 1.55; }
+.report-section p, .limitations { color: #45453f; font-size: 17px; line-height: 1.7; }
+.citation { color: var(--accent); font-size: 13px; font-weight: 700; margin-left: 3px; text-decoration: none; }
+.sources { align-self: start; position: sticky; top: 24px; }
+.source-card { align-items: flex-start; border-top: 1px solid var(--border); display: flex; gap: 12px; padding: 15px 0; text-decoration: none; }
+.source-card:hover strong { color: var(--accent); }
+.source-number { align-items: center; background: #ecece7; border-radius: 50%; display: flex; flex: 0 0 24px; font-size: 12px; height: 24px; justify-content: center; }
+.source-card strong { display: block; font-size: 14px; line-height: 1.35; }
+.source-card small { color: var(--muted); display: block; font-size: 12px; margin-top: 5px; }
+.link-button { display: inline-block; margin-top: 18px; text-decoration: none; }
+@media (max-width: 800px) { .result-grid { display: block; margin-top: 48px; } .sources { margin-top: 48px; position: static; } }
 @media (max-width: 640px) { .shell { padding: 0 16px 48px; } .hero { margin-top: 12vh; } .nav { gap: 12px; } }
-
