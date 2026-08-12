@@ -20,6 +20,8 @@ class Settings(BaseSettings):
     llm_api_key: str | None = None
     llm_model: str = "demo"
     llm_timeout_seconds: float = 25.0
+    provider_max_retries: int = Field(default=1, ge=0, le=3)
+    provider_retry_backoff_seconds: float = Field(default=0.2, ge=0, le=5)
     llm_fallback_enabled: bool = False
     llm_fallback_provider: str | None = None
     llm_fallback_api_key: str | None = None

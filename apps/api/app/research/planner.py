@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 
 from app.core.errors import INSUFFICIENT_SOURCES, DomainError
-from app.research.budget import RunBudget, estimate_tokens
+from app.research.budget import RunBudget
 from app.research.models import LLMProvider, LLMRequest, PlannerResult
 
 
@@ -24,12 +24,7 @@ class Planner:
             max_output_tokens=min(400, self.budget.max_output_tokens),
             temperature=0.2,
         )
-        serialized = json.dumps(request.messages)
-        reservation = self.budget.reserve_call(
-            estimate_tokens(serialized), request.max_output_tokens
-        )
-        response = await self.provider.complete(request)
-        self.budget.reconcile(reservation, response)
+        response = await self.provider.complete(request, self.budget)
         try:
             payload = json.loads(response.content)
             queries = [str(query).strip() for query in payload["queries"] if str(query).strip()]

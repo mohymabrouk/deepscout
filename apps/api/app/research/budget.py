@@ -49,5 +49,10 @@ class RunBudget:
                 TOKEN_BUDGET_EXCEEDED, "The provider response exceeded the token budget.", 429
             )
 
+    def release_output_reservation(self, reservation: tuple[int, int]) -> None:
+        """Keep a failed attempt counted while releasing output never generated."""
+        _, requested_output = reservation
+        self.output_tokens = max(0, self.output_tokens - requested_output)
+
     def usage(self) -> tuple[int, int, int]:
         return self.input_tokens, self.output_tokens, self.llm_calls

@@ -1,9 +1,7 @@
 from __future__ import annotations
 
-import json
-
 from app.core.errors import INSUFFICIENT_SOURCES, DomainError
-from app.research.budget import RunBudget, estimate_tokens
+from app.research.budget import RunBudget
 from app.research.models import EvidencePassage, LLMProvider, LLMRequest
 from app.schemas.research import ResearchReport
 
@@ -37,12 +35,7 @@ class Synthesizer:
             max_output_tokens=min(2000, self.budget.max_output_tokens - self.budget.output_tokens),
             temperature=0.3,
         )
-        serialized = json.dumps(request.messages)
-        reservation = self.budget.reserve_call(
-            estimate_tokens(serialized), request.max_output_tokens
-        )
-        response = await self.provider.complete(request)
-        self.budget.reconcile(reservation, response)
+        response = await self.provider.complete(request, self.budget)
         try:
             return ResearchReport.model_validate_json(response.content)
         except ValueError as exc:

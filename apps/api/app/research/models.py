@@ -63,7 +63,7 @@ class LLMResponse:
 
 
 class LLMProvider(Protocol):
-    async def complete(self, request: LLMRequest) -> LLMResponse: ...
+    async def complete(self, request: LLMRequest, budget: Any = None) -> LLMResponse: ...
 
 
 class SearchProvider(Protocol):

@@ -18,7 +18,7 @@ class OpenAICompatibleProvider:
         self.base_url = base_url.rstrip("/")
         self.timeout = timeout
 
-    async def complete(self, request: LLMRequest) -> LLMResponse:
+    async def complete(self, request: LLMRequest, budget=None) -> LLMResponse:
         body = {
             "model": self.model,
             "messages": request.messages,

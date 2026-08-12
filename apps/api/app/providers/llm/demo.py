@@ -12,7 +12,7 @@ class DemoLLMProvider:
     provider = "demo"
     model = "demo-v1"
 
-    async def complete(self, request: LLMRequest) -> LLMResponse:
+    async def complete(self, request: LLMRequest, budget=None) -> LLMResponse:
         if request.purpose == "planner":
             question = request.messages[-1]["content"]
             words = [word for word in re.findall(r"[\w-]+", question.lower()) if len(word) > 3]
