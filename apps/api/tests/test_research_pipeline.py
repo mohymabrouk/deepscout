@@ -33,6 +33,9 @@ def test_demo_orchestrator_completes_with_sources_and_events():
         events = client.get(f"/v1/research/{run_id}/events")
         assert events.status_code == 200
         assert "event: complete" in events.text
+        for stage in ["planning", "searching", "fetching", "selecting", "synthesizing", "verifying"]:
+            assert f'"stage": "{stage}"' in events.text
+        assert '"sources_found": 4' in events.text
 
 
 def test_idempotency_returns_original_run():

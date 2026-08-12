@@ -130,7 +130,24 @@ Run the validation suite from the repository root:
 cd apps/web && npm run lint && npm run typecheck && npm run build && npm audit
 ```
 
-The API currently uses an in-memory repository for local/demo execution. The initial Postgres schema is in `infra/sql/001_initial.sql`; persistent repository wiring is intentionally separate from the Phase 1–2 local MVP.
+The API currently uses an in-memory repository for local/demo execution. The initial Postgres schema is in `infra/sql/001_initial.sql`; persistent repository wiring, auth/history, and deployment remain separate follow-up work.
+
+## Deterministic benchmark
+
+The Phase 4 smoke evaluation contains 32 cases across technical comparisons, explanations, landscapes, fact checks, recency-sensitive questions, ambiguity, insufficient evidence, provider failures, and retrieval security. It runs against deterministic demo providers and is regression-gated in CI.
+
+| Metric | Demo baseline / current |
+|---|---:|
+| Completion rate | 100% |
+| Invalid citation case rate | 0% |
+| Citation coverage | 100% |
+| Citation URL integrity | 100% |
+| Retrieval sufficiency | 100% |
+| Concept coverage (demo-v1 → demo-v2) | 5.2% → 14.6% (+9.375 pp) |
+| Median total tokens | 650.0 |
+| Median model calls | 2 |
+
+Run details and the regression policy are in [`evals/README.md`](evals/README.md).
 
 Copy `.env.example` into the relevant app environment files and fill only the services you are using.
 

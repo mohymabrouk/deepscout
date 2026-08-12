@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "comparison": {
+    "baseline": "demo-v1",
+    "current": "demo-v2",
+    "concept_coverage_absolute_delta": 0.09375,
+    "concept_coverage_percentage_point_delta": 9.375,
+    "median_total_tokens_percentage_delta": 7.883817427385892,
+    "interpretation": "The deterministic adapter now carries retrieved evidence into the report, improving concept coverage while staying within the 20 percent token regression gate."
+  },
+  "current_aggregate": {
+    "case_count": 32,
+    "completion_rate": 1.0,
+    "invalid_citation_case_rate": 0.0,
+    "citation_coverage": 1.0,
+    "citation_url_integrity_rate": 1.0,
+    "retrieval_sufficiency_rate": 1.0,
+    "concept_coverage": 0.14583333333333331,
+    "median_total_tokens": 650.0,
+    "median_llm_calls": 2.0,
+    "median_sources": 3.0
+  }
+}

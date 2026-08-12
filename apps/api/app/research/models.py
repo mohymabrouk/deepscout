@@ -60,6 +60,34 @@ class LLMResponse:
     usage: LLMUsage
     provider: str
     model: str
+    used_fallback: bool = False
+
+
+@dataclass
+class StageTiming:
+    stage: str
+    started_at: datetime
+    completed_at: datetime | None = None
+    duration_ms: float | None = None
+    status: Literal["completed", "failed"] = "completed"
+
+
+@dataclass
+class RunMetrics:
+    started_at: datetime
+    completed_at: datetime | None = None
+    stage_timings: list[StageTiming] = field(default_factory=list)
+    search_calls: int = 0
+    pages_attempted: int = 0
+    pages_succeeded: int = 0
+    provider_names: list[str] = field(default_factory=list)
+    fallback_used: bool = False
+
+    @property
+    def latency_ms(self) -> float | None:
+        if self.completed_at is None:
+            return None
+        return (self.completed_at - self.started_at).total_seconds() * 1000
 
 
 class LLMProvider(Protocol):

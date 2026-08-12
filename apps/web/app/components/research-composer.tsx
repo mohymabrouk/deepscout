@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, KeyboardEvent, useState } from "react";
+import { FormEvent, KeyboardEvent, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { startResearch } from "../../lib/api";
 
@@ -14,6 +14,14 @@ export default function ResearchComposer() {
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const router = useRouter();
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  function resizeTextarea() {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+    textarea.style.height = "auto";
+    textarea.style.height = `${Math.min(textarea.scrollHeight, 224)}px`;
+  }
 
   async function submit(event?: FormEvent) {
     event?.preventDefault();
@@ -31,16 +39,17 @@ export default function ResearchComposer() {
 
   function onKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
     if ((event.metaKey || event.ctrlKey) && event.key === "Enter") submit();
+    if (event.key === "Escape") setQuestion("");
   }
 
   return (
     <>
       <form className="composer" onSubmit={submit} aria-label="Research question">
-        <textarea aria-label="Research question" value={question} onChange={(event) => setQuestion(event.target.value)} onKeyDown={onKeyDown} maxLength={1500} placeholder="What would you like to investigate?" required minLength={10} disabled={submitting} />
-        <div className="composer-footer"><span className="hint">Cmd/Ctrl + Enter to research</span><button className="primary" type="submit" disabled={submitting}>{submitting ? "Starting…" : "Research"}</button></div>
+        <textarea ref={textareaRef} aria-label="Research question" aria-keyshortcuts="Control+Enter Meta+Enter" value={question} onChange={(event) => { setQuestion(event.target.value); resizeTextarea(); }} onKeyDown={onKeyDown} maxLength={1500} placeholder="What would you like to investigate?" required minLength={10} disabled={submitting} />
+        <div className="composer-footer"><span className="hint">Cmd/Ctrl + Enter to research · Esc to clear</span><span className="character-count" aria-live="polite">{question.length > 1300 ? `${question.length}/1500` : ""}</span><button className="primary" type="submit" disabled={submitting}>{submitting ? "Starting…" : "Research"}</button></div>
       </form>
       {error && <p className="error" role="alert">{error}</p>}
-      <div className="examples" aria-label="Example questions"><span>Try:</span>{examples.map((example) => <button key={example} type="button" onClick={() => setQuestion(example)}>{example}</button>)}</div>
+      <div className="examples" aria-label="Example questions"><span>Try:</span>{examples.map((example) => <button key={example} type="button" onClick={() => { setQuestion(example); requestAnimationFrame(resizeTextarea); }}>{example}</button>)}</div>
     </>
   );
 }

@@ -5,6 +5,8 @@ export type StageEvent = {
   data?: Record<string, unknown>;
 };
 
+export type StageKey = "planning" | "searching" | "fetching" | "selecting" | "synthesizing" | "verifying";
+
 export type Source = {
   citation_id: number;
   title: string;
@@ -49,8 +51,11 @@ export async function getResearch(runId: string): Promise<ResearchResult> {
   return payload;
 }
 
-export function subscribeToEvents(runId: string, onEvent: (event: StageEvent) => void) {
+export function subscribeToEvents(runId: string, onEvent: (event: StageEvent) => void, onConnection?: (state: "connecting" | "open" | "reconnecting") => void) {
   const source = new EventSource(`${apiBase}/v1/research/${runId}/events`);
+  onConnection?.("connecting");
+  source.onopen = () => onConnection?.("open");
+  source.onerror = () => onConnection?.("reconnecting");
   const eventTypes: StageEvent["event"][] = ["stage", "complete", "error"];
   eventTypes.forEach((type) => {
     source.addEventListener(type, (event) => {

@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "description": "Deterministic demo-provider baseline generated from evals/cases.jsonl.",
+  "aggregate": {
+    "case_count": 32,
+    "completion_rate": 1.0,
+    "invalid_citation_case_rate": 0.0,
+    "citation_coverage": 1.0,
+    "citation_url_integrity_rate": 1.0,
+    "retrieval_sufficiency_rate": 1.0,
+    "concept_coverage": 0.05208333333333333,
+    "median_latency_ms": 1.36,
+    "p95_latency_ms": 1.90,
+    "median_total_tokens": 602.5,
+    "median_llm_calls": 2.0,
+    "median_sources": 3.0,
+    "provider_fallback_rate": 0.0
+  }
+}

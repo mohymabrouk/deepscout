@@ -11,6 +11,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from uuid import uuid4
 
+from app.research.models import RunMetrics, StageTiming
 from app.schemas.events import RunEvent
 from app.schemas.research import ResearchReport, Source, Usage
 
@@ -30,6 +31,10 @@ class RunRecord:
     error_code: str | None = None
     events: list[RunEvent] = field(default_factory=list)
     created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    metrics: RunMetrics = field(init=False)
+
+    def __post_init__(self) -> None:
+        self.metrics = RunMetrics(started_at=self.created_at)
 
 
 class InMemoryRunRepository:
@@ -68,6 +73,32 @@ class InMemoryRunRepository:
     async def increment_search_calls(self, run_id: str) -> None:
         async with self._lock:
             self._runs[run_id].search_calls += 1
+            self._runs[run_id].metrics.search_calls += 1
+
+    async def set_fetch_counts(self, run_id: str, attempted: int, succeeded: int) -> None:
+        async with self._lock:
+            metrics = self._runs[run_id].metrics
+            metrics.pages_attempted = max(0, attempted)
+            metrics.pages_succeeded = max(0, succeeded)
+
+    async def record_stage(self, run_id: str, stage: str, started_at: datetime, completed_at: datetime, status: str = "completed") -> None:
+        async with self._lock:
+            self._runs[run_id].metrics.stage_timings.append(
+                StageTiming(
+                    stage=stage,
+                    started_at=started_at,
+                    completed_at=completed_at,
+                    duration_ms=(completed_at - started_at).total_seconds() * 1000,
+                    status="failed" if status == "failed" else "completed",
+                )
+            )
+
+    async def finalize_metrics(self, run_id: str, completed_at: datetime, budget) -> None:
+        async with self._lock:
+            metrics = self._runs[run_id].metrics
+            metrics.completed_at = completed_at
+            metrics.provider_names = list(budget.provider_names)
+            metrics.fallback_used = budget.fallback_used
 
     async def fail(self, run_id: str, status: str, error_code: str) -> None:
         async with self._lock:
