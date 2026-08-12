@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from xml.sax.saxutils import escape
+
 from app.core.errors import INSUFFICIENT_SOURCES, DomainError
 from app.research.budget import RunBudget
 from app.research.models import EvidencePassage, LLMProvider, LLMRequest
@@ -8,10 +10,12 @@ from app.schemas.research import ResearchReport
 
 def evidence_prompt(question: str, evidence: list[EvidencePassage]) -> str:
     blocks = [
-        f'<SOURCE id="{index}" title="{item.source.title}" domain="{item.source.domain}">\n<EVIDENCE>{item.excerpt}</EVIDENCE>\n</SOURCE>'
+        f'<SOURCE id="{index}" title="{escape(item.source.title, {"\"": "&quot;"})}" '
+        f'domain="{escape(item.source.domain, {"\"": "&quot;"})}">\n'
+        f'<EVIDENCE>{escape(item.excerpt)}</EVIDENCE>\n</SOURCE>'
         for index, item in enumerate(evidence, start=1)
     ]
-    return "Question: " + question + "\n\n" + "\n".join(blocks)
+    return "Question: " + escape(question) + "\n\n" + "\n".join(blocks)
 
 
 class Synthesizer:
