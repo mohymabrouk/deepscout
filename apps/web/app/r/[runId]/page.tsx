@@ -6,6 +6,7 @@ import { getResearch, ResearchResult, StageEvent, StageKey, subscribeToEvents } 
 import ReportView from "../../components/report-view";
 import ShareButton from "../../components/share-button";
 import StageProgress from "../../components/stage-progress";
+import { getAccessToken } from "../../../lib/supabase";
 
 export default function RunPage({ params }: { params: { runId: string } }) {
   const [result, setResult] = useState<ResearchResult | null>(null);
@@ -16,18 +17,22 @@ export default function RunPage({ params }: { params: { runId: string } }) {
 
   useEffect(() => {
     let active = true;
-    getResearch(params.runId).then((value) => {
+    let unsubscribe = () => {};
+    getAccessToken().then((accessToken) => {
+      if (!active) return;
+      getResearch(params.runId, accessToken).then((value) => {
       if (!active) return;
       setResult(value);
       if (value.status !== "pending") setStage(value.status as StageKey);
       if (value.status === "failed" || value.status === "limited") setError(value.error_code || "Research run failed.");
-    }).catch((cause) => active && setError(cause instanceof Error ? cause.message : "Run not found."));
-    const unsubscribe = subscribeToEvents(params.runId, (event: StageEvent) => {
+      }).catch((cause) => active && setError(cause instanceof Error ? cause.message : "Run not found."));
+      unsubscribe = subscribeToEvents(params.runId, accessToken, (event: StageEvent) => {
       if (event.stage) setStage(event.stage as StageKey);
       if (event.data) setStageData(event.data);
-      if (event.event === "error") getResearch(params.runId).then((value) => { if (active) { setResult(value); setError(value.error_code || "Research run failed."); } });
-      if (event.event === "complete") getResearch(params.runId).then((value) => active && setResult(value));
-    }, setConnectionState);
+      if (event.event === "error") getResearch(params.runId, accessToken).then((value) => { if (active) { setResult(value); setError(value.error_code || "Research run failed."); } });
+      if (event.event === "complete") getResearch(params.runId, accessToken).then((value) => active && setResult(value));
+      }, setConnectionState);
+    });
     return () => { active = false; unsubscribe(); };
   }, [params.runId]);
 

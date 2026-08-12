@@ -3,6 +3,7 @@
 import { FormEvent, KeyboardEvent, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { startResearch } from "../../lib/api";
+import { getAccessToken } from "../../lib/supabase";
 
 const examples = [
   "Compare pgvector and hosted vector databases for a small SaaS.",
@@ -29,7 +30,7 @@ export default function ResearchComposer() {
     setError("");
     setSubmitting(true);
     try {
-      const result = await startResearch(question, crypto.randomUUID());
+      const result = await startResearch(question, crypto.randomUUID(), await getAccessToken());
       router.push(`/r/${result.run_id}`);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Research could not be started.");
