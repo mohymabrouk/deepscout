@@ -16,6 +16,7 @@ def token(user_id: str) -> str:
         {
             "sub": user_id,
             "aud": "authenticated",
+            "role": "authenticated",
             "exp": datetime.now(UTC) + timedelta(hours=1),
         },
         SECRET,

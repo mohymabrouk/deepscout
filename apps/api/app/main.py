@@ -33,7 +33,6 @@ def create_app() -> FastAPI:
     app.state.orchestrator = ResearchOrchestrator(settings, app.state.repository)
     app.state.tasks = set()
     app.state.run_tasks = {}
-    app.state.idempotency = {}
     app.state.rate_limiter = FixedWindowRateLimiter()
     app.state.quota_service = RunQuotaService()
     app.add_middleware(

@@ -67,6 +67,8 @@ def authenticate_request(authorization: str | None, settings: Settings) -> AuthU
     except (jwt.InvalidTokenError, ValueError, TypeError):
         raise DomainError(UNAUTHORIZED, "Authentication is required or the token is invalid.", 401) from None
 
+    if claims.get("role") != "authenticated":
+        raise DomainError(UNAUTHORIZED, "Authentication is required or the token is invalid.", 401)
     email = claims.get("email")
     return AuthUser(user_id=user_id, email=email if isinstance(email, str) else None)
 

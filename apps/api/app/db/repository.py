@@ -44,6 +44,7 @@ class RunRecord:
 class InMemoryRunRepository:
     def __init__(self) -> None:
         self._runs: dict[str, RunRecord] = {}
+        self._idempotency: dict[tuple[str, str], str] = {}
         self._lock = asyncio.Lock()
 
     async def create(
@@ -170,3 +171,13 @@ class InMemoryRunRepository:
                 return False
             del self._runs[run_id]
             return True
+
+    async def get_idempotency(self, identity_key: str, idempotency_key: str) -> str | None:
+        async with self._lock:
+            return self._idempotency.get((identity_key, idempotency_key))
+
+    async def save_idempotency(
+        self, identity_key: str, idempotency_key: str, run_id: str
+    ) -> None:
+        async with self._lock:
+            self._idempotency.setdefault((identity_key, idempotency_key), run_id)

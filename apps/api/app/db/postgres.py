@@ -381,3 +381,28 @@ class PostgresRunRepository:
                     identity_key,
                 )
         return result.endswith("1")
+
+    async def get_idempotency(self, identity_key: str, idempotency_key: str) -> str | None:
+        pool = await self._get_pool()
+        async with pool.acquire() as connection:
+            row = await connection.fetchrow(
+                "select run_id from idempotency_keys where identity_key = $1 and idempotency_key = $2",
+                identity_key,
+                idempotency_key,
+            )
+        return str(row["run_id"]) if row else None
+
+    async def save_idempotency(
+        self, identity_key: str, idempotency_key: str, run_id: str
+    ) -> None:
+        pool = await self._get_pool()
+        async with pool.acquire() as connection:
+            await connection.execute(
+                """
+                insert into idempotency_keys (identity_key, idempotency_key, run_id)
+                values ($1, $2, $3) on conflict (identity_key, idempotency_key) do nothing
+                """,
+                identity_key,
+                idempotency_key,
+                UUID(run_id),
+            )

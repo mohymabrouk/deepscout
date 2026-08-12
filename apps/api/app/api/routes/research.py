@@ -65,13 +65,15 @@ async def create_research(
     identity_key = request.state.identity_key
     authenticated = request.state.authenticated
     if idempotency_key:
-        existing = getattr(request.app.state, "idempotency", {}).get(
-            (identity_key, idempotency_key)
-        )
+        existing = await request.app.state.repository.get_idempotency(identity_key, idempotency_key)
         if existing:
-            return ResearchAccepted(
-                run_id=existing, status="pending", events_url=f"/v1/research/{existing}/events"
+            record = await request.app.state.repository.get_owned(
+                existing, identity_key, request.state.user_id
             )
+            if record:
+                return ResearchAccepted(
+                    run_id=existing, status="pending", events_url=f"/v1/research/{existing}/events"
+                )
     await request.app.state.quota_service.reserve_run(
         identity_key,
         request.app.state.settings.auth_runs_per_day if authenticated else request.app.state.settings.anon_runs_per_day,
@@ -81,7 +83,7 @@ async def create_research(
         body.question, identity_key, request.state.user_id
     )
     if idempotency_key:
-        request.app.state.idempotency[(identity_key, idempotency_key)] = record.id
+        await request.app.state.repository.save_idempotency(identity_key, idempotency_key, record.id)
     task = asyncio.create_task(_execute(request, record.id, body.question, identity_key))
     request.app.state.tasks.add(task)
     request.app.state.run_tasks[record.id] = task
