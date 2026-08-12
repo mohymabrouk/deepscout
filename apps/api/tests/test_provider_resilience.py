@@ -61,4 +61,3 @@ async def test_search_retries_transient_failure_once():
     result = await provider.search("test", 1)
     assert len(result) == 1
     assert search.calls == 2
-

@@ -21,4 +21,3 @@ class ReliableSearchProvider:
                     raise
                 await asyncio.sleep(self.backoff_seconds * (2**attempt))
         raise DomainError(SEARCH_UNAVAILABLE, "The search provider is unavailable.", 503)
-

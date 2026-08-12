@@ -55,4 +55,3 @@ class ReliableLLMProvider:
         if last_error is not None:
             raise last_error
         raise DomainError(PROVIDER_UNAVAILABLE, "The inference provider is unavailable.", 503)
-

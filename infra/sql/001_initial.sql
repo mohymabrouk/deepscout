@@ -51,4 +51,3 @@ create table if not exists usage_daily (
   search_calls integer not null default 0,
   primary key(identity_key, usage_date)
 );
-

@@ -16,4 +16,3 @@ def test_anonymous_identity_does_not_expose_ip():
     identity = anonymous_identity("192.0.2.10", "a" * 32)
     assert identity.startswith("anon_")
     assert "192.0.2.10" not in identity
-

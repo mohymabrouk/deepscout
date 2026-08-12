@@ -26,4 +26,3 @@ def test_budget_reconciles_provider_usage():
         LLMResponse("{}", LLMUsage(input_tokens=20, output_tokens=30), "test", "test"),
     )
     assert budget.usage() == (20, 30, 1)
-

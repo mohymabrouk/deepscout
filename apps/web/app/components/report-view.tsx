@@ -14,4 +14,3 @@ export default function ReportView({ report, sources }: { report: Report; source
     </div>
   );
 }
-
