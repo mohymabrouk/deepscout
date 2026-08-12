@@ -1,6 +1,6 @@
 from functools import lru_cache
 
-from pydantic import Field
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -56,10 +56,25 @@ class Settings(BaseSettings):
     max_input_tokens_per_run: int = Field(default=18_000, ge=1)
     max_output_tokens_per_run: int = Field(default=2_500, ge=1)
     max_run_seconds: float = Field(default=60.0, gt=0)
+    max_request_bytes: int = Field(default=64_000, ge=1024)
 
+    log_level: str = "INFO"
     store_question_text: bool = False
     enable_fallback_provider: bool = True
     enable_debug_usage: bool = False
+
+    @model_validator(mode="after")
+    def validate_production_settings(self) -> "Settings":
+        if self.app_env.lower() in {"production", "prod"}:
+            if self.anon_id_hmac_secret == "local-development-secret":
+                raise ValueError("ANON_ID_HMAC_SECRET must be replaced in production.")
+            if not self.database_url:
+                raise ValueError("DATABASE_URL is required in production.")
+            if self.llm_provider == "demo" or not self.llm_api_key:
+                raise ValueError("A production LLM provider and API key are required.")
+            if self.search_provider == "demo" or not self.search_api_key:
+                raise ValueError("A production search provider and API key are required.")
+        return self
 
 
 @lru_cache

@@ -47,6 +47,28 @@ class PostgresRunRepository:
             await connection.fetchval("select 1")
         return True
 
+    async def recover_incomplete_runs(self) -> None:
+        pool = await self._get_pool()
+        async with pool.acquire() as connection:
+            async with connection.transaction():
+                rows = await connection.fetch(
+                    """
+                    update research_runs
+                    set status = 'failed', stage = 'failed',
+                        error_code = 'API_RESTARTED', completed_at = now()
+                    where status not in ('completed', 'failed', 'limited')
+                    returning id
+                    """
+                )
+                if rows:
+                    await connection.executemany(
+                        """
+                        insert into run_events (run_id, event_type, payload)
+                        values ($1, 'error', $2::jsonb)
+                        """,
+                        [(row["id"], '{"code":"API_RESTARTED"}') for row in rows],
+                    )
+
     @staticmethod
     def _run_uuid(run_id: str) -> UUID | None:
         try:

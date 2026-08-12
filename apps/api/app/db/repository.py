@@ -219,3 +219,11 @@ class InMemoryRunRepository:
 
     async def ready(self) -> bool:
         return True
+
+    async def recover_incomplete_runs(self) -> None:
+        async with self._lock:
+            for run in self._runs.values():
+                if run.status not in TERMINAL_STATUSES:
+                    run.status = "failed"
+                    run.error_code = "API_RESTARTED"
+                    run.events.append(RunEvent(event="error", data={"code": "API_RESTARTED"}))
