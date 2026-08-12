@@ -102,6 +102,8 @@ A run is considered successful when:
 
 ## Local development
 
+The default local configuration uses deterministic `demo` search and LLM adapters, so the complete research flow works without provider credentials. Set `LLM_PROVIDER` and `SEARCH_PROVIDER` in `.env` to use real providers.
+
 Frontend:
 
 ```bash
@@ -119,6 +121,16 @@ source .venv/bin/activate
 pip install -r requirements.txt
 uvicorn app.main:app --reload
 ```
+
+Run the validation suite from the repository root:
+
+```bash
+.venv/bin/ruff check apps/api
+.venv/bin/pytest -q
+cd apps/web && npm run lint && npm run typecheck && npm run build && npm audit
+```
+
+The API currently uses an in-memory repository for local/demo execution. The initial Postgres schema is in `infra/sql/001_initial.sql`; persistent repository wiring is intentionally separate from the Phase 1–2 local MVP.
 
 Copy `.env.example` into the relevant app environment files and fill only the services you are using.
 
