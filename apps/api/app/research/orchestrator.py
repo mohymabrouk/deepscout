@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
+from datetime import UTC, datetime
 
 from app.config import Settings
 from app.core.errors import INSUFFICIENT_SOURCES, RUN_TIMEOUT, DomainError
@@ -30,8 +31,22 @@ class ResearchOrchestrator:
             self.settings.max_input_tokens_per_run,
             self.settings.max_output_tokens_per_run,
         )
+        active_stage: tuple[str, datetime] | None = None
+
+        async def close_stage(status: str = "completed") -> None:
+            nonlocal active_stage
+            if active_stage is not None:
+                name, started_at = active_stage
+                await self.repository.record_stage(run_id, name, started_at, datetime.now(UTC), status)
+                active_stage = None
 
         async def stage(name: str, message: str, data: dict | None = None) -> None:
+            nonlocal active_stage
+            if active_stage is None:
+                active_stage = (name, datetime.now(UTC))
+            elif active_stage[0] != name:
+                await close_stage()
+                active_stage = (name, datetime.now(UTC))
             await self.repository.update_status(run_id, name)
             await self.repository.append_event(
                 run_id, RunEvent(event="stage", stage=name, message=message, data=data or {})
@@ -69,6 +84,7 @@ class ResearchOrchestrator:
             pages = await SafeFetcher(self.settings).fetch_many(
                 unique_results, self.settings.max_fetched_pages
             )
+            await self.repository.set_fetch_counts(run_id, len(unique_results[: self.settings.max_fetched_pages]), len(pages))
             if len(pages) < 1:
                 raise DomainError(
                     INSUFFICIENT_SOURCES, "Not enough usable sources were retrieved.", 502
@@ -93,6 +109,7 @@ class ResearchOrchestrator:
             report = await Synthesizer(provider, budget).synthesize(question, evidence)
             await stage("verifying", "Verifying citations")
             report, _ = CitationVerifier().verify(report, evidence)
+            await close_stage()
             sources = [
                 Source(
                     citation_id=index,
@@ -110,15 +127,18 @@ class ResearchOrchestrator:
                 sources,
                 Usage(input_tokens=input_tokens, output_tokens=output_tokens, llm_calls=llm_calls),
             )
+            await self.repository.finalize_metrics(run_id, datetime.now(UTC), budget)
             await self.repository.append_event(
                 run_id, RunEvent(event="complete", data={"run_id": run_id, "status": "completed"})
             )
         except TimeoutError:
+            await close_stage("failed")
             await self.repository.fail(run_id, "failed", RUN_TIMEOUT)
             await self.repository.append_event(
                 run_id, RunEvent(event="error", data={"code": RUN_TIMEOUT})
             )
         except DomainError as exc:
+            await close_stage("failed")
             await self.repository.fail(
                 run_id, "limited" if exc.code == "TOKEN_BUDGET_EXCEEDED" else "failed", exc.code
             )
@@ -126,6 +146,7 @@ class ResearchOrchestrator:
                 run_id, RunEvent(event="error", data={"code": exc.code, "message": exc.message})
             )
         except Exception:
+            await close_stage("failed")
             await self.repository.fail(run_id, "failed", "INTERNAL_ERROR")
             await self.repository.append_event(
                 run_id, RunEvent(event="error", data={"code": "INTERNAL_ERROR"})

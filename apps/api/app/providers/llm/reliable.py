@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+from dataclasses import replace
 
 from app.core.errors import PROVIDER_RATE_LIMIT, PROVIDER_UNAVAILABLE, DomainError
 from app.research.budget import RunBudget, estimate_tokens
@@ -51,7 +52,7 @@ class ReliableLLMProvider:
                 else:
                     if budget is not None and reservation is not None:
                         budget.reconcile(reservation, response)
-                    return response
+                    return replace(response, used_fallback=provider_index > 0)
         if last_error is not None:
             raise last_error
         raise DomainError(PROVIDER_UNAVAILABLE, "The inference provider is unavailable.", 503)

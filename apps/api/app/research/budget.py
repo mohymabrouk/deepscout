@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from app.core.errors import TOKEN_BUDGET_EXCEEDED, DomainError
 from app.research.models import LLMResponse
@@ -19,6 +19,8 @@ class RunBudget:
     llm_calls: int = 0
     input_tokens: int = 0
     output_tokens: int = 0
+    provider_names: list[str] = field(default_factory=list)
+    fallback_used: bool = False
 
     def reserve_call(self, estimated_input: int, requested_output: int) -> tuple[int, int]:
         if self.llm_calls + 1 > self.max_llm_calls:
@@ -44,6 +46,9 @@ class RunBudget:
         actual_output = max(0, response.usage.output_tokens)
         self.input_tokens += actual_input - estimated_input
         self.output_tokens += actual_output - requested_output
+        if response.provider not in self.provider_names:
+            self.provider_names.append(response.provider)
+        self.fallback_used = self.fallback_used or response.used_fallback
         if self.input_tokens > self.max_input_tokens or self.output_tokens > self.max_output_tokens:
             raise DomainError(
                 TOKEN_BUDGET_EXCEEDED, "The provider response exceeded the token budget.", 429
