@@ -181,3 +181,6 @@ class InMemoryRunRepository:
     ) -> None:
         async with self._lock:
             self._idempotency.setdefault((identity_key, idempotency_key), run_id)
+
+    async def ready(self) -> bool:
+        return True

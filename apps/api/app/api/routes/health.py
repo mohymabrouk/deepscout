@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, HTTPException, Request
 
 router = APIRouter(tags=["health"])
 
@@ -10,4 +10,8 @@ async def health(request: Request) -> dict[str, str]:
 
 @router.get("/ready")
 async def ready(request: Request) -> dict[str, bool | str]:
-    return {"status": "ready", "database": bool(request.app.state.settings.database_url) or True}
+    try:
+        database_ready = await request.app.state.repository.ready()
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail="Database is not ready.") from exc
+    return {"status": "ready", "database": database_ready}

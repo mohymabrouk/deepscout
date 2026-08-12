@@ -40,6 +40,12 @@ class PostgresRunRepository:
             await self._pool.close()
             self._pool = None
 
+    async def ready(self) -> bool:
+        pool = await self._get_pool()
+        async with pool.acquire() as connection:
+            await connection.fetchval("select 1")
+        return True
+
     @staticmethod
     def _run_uuid(run_id: str) -> UUID | None:
         try:

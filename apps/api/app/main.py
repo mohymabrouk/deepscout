@@ -14,7 +14,12 @@ from app.api.routes.runs import router as runs_router
 from app.api.routes.usage import router as usage_router
 from app.config import get_settings
 from app.core.errors import HTTP_RATE_LIMIT, DomainError
-from app.core.rate_limit import FixedWindowRateLimiter, RunQuotaService
+from app.core.rate_limit import (
+    FixedWindowRateLimiter,
+    PostgresFixedWindowRateLimiter,
+    PostgresRunQuotaService,
+    RunQuotaService,
+)
 from app.core.security import anonymous_identity, authenticate_request, authenticated_identity
 from app.db.postgres import PostgresRunRepository
 from app.db.repository import InMemoryRunRepository
@@ -33,8 +38,16 @@ def create_app() -> FastAPI:
     app.state.orchestrator = ResearchOrchestrator(settings, app.state.repository)
     app.state.tasks = set()
     app.state.run_tasks = {}
-    app.state.rate_limiter = FixedWindowRateLimiter()
-    app.state.quota_service = RunQuotaService()
+    app.state.rate_limiter = (
+        PostgresFixedWindowRateLimiter(settings.database_url)
+        if settings.database_url
+        else FixedWindowRateLimiter()
+    )
+    app.state.quota_service = (
+        PostgresRunQuotaService(settings.database_url)
+        if settings.database_url
+        else RunQuotaService()
+    )
     app.add_middleware(
         CORSMiddleware,
         allow_origins=[settings.frontend_origin],
@@ -126,6 +139,10 @@ def create_app() -> FastAPI:
         close = getattr(app.state.repository, "close", None)
         if close:
             await close()
+        for service in (app.state.rate_limiter, app.state.quota_service):
+            close = getattr(service, "close", None)
+            if close:
+                await close()
 
     return app
 
