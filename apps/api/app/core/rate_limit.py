@@ -26,6 +26,11 @@ class FixedWindowRateLimiter:
         number = int(timestamp // self.window_seconds)
         reset_at = (number + 1) * self.window_seconds
         async with self._lock:
+            self._windows = {
+                identity: item
+                for identity, item in self._windows.items()
+                if item.number >= number - 1
+            }
             window = self._windows.get(key)
             if window is None or window.number != number:
                 window = _Window(number)
@@ -55,6 +60,7 @@ class RunQuotaService:
 
     def __init__(self) -> None:
         self._usage: dict[tuple[str, date], _DailyUsage] = {}
+        self._active_runs: dict[str, int] = {}
         self._lock = asyncio.Lock()
 
     @staticmethod
@@ -64,6 +70,9 @@ class RunQuotaService:
     async def reserve_run(self, identity: str, daily_limit: int, concurrency_limit: int) -> None:
         today = self._today()
         async with self._lock:
+            self._usage = {
+                key: value for key, value in self._usage.items() if key[1] >= today
+            }
             usage = self._usage.setdefault((identity, today), _DailyUsage())
             if usage.runs_used >= daily_limit:
                 raise DomainError(
@@ -72,7 +81,7 @@ class RunQuotaService:
                     429,
                     retry_after_seconds=self.seconds_until_reset(),
                 )
-            if usage.active_runs >= concurrency_limit:
+            if self._active_runs.get(identity, 0) >= concurrency_limit:
                 raise DomainError(
                     CONCURRENCY_LIMIT,
                     "The maximum number of active research runs has been reached.",
@@ -81,12 +90,18 @@ class RunQuotaService:
                 )
             usage.runs_used += 1
             usage.active_runs += 1
+            self._active_runs[identity] = self._active_runs.get(identity, 0) + 1
 
     async def finish_run(self, identity: str, input_tokens: int = 0, output_tokens: int = 0, llm_calls: int = 0, search_calls: int = 0) -> None:
         today = self._today()
         async with self._lock:
             usage = self._usage.setdefault((identity, today), _DailyUsage())
             usage.active_runs = max(0, usage.active_runs - 1)
+            active = max(0, self._active_runs.get(identity, 0) - 1)
+            if active:
+                self._active_runs[identity] = active
+            else:
+                self._active_runs.pop(identity, None)
             usage.input_tokens += max(0, input_tokens)
             usage.output_tokens += max(0, output_tokens)
             usage.llm_calls += max(0, llm_calls)
