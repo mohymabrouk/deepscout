@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, KeyboardEvent, useState } from "react";
+import { useRouter } from "next/navigation";
 import { startResearch } from "../../lib/api";
 
 const examples = [
@@ -12,6 +13,7 @@ export default function ResearchComposer() {
   const [question, setQuestion] = useState("");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const router = useRouter();
 
   async function submit(event?: FormEvent) {
     event?.preventDefault();
@@ -20,7 +22,7 @@ export default function ResearchComposer() {
     setSubmitting(true);
     try {
       const result = await startResearch(question, crypto.randomUUID());
-      window.location.assign(`/r/${result.run_id}`);
+      router.push(`/r/${result.run_id}`);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Research could not be started.");
       setSubmitting(false);

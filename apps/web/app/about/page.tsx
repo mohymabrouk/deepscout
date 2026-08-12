@@ -1,7 +1,9 @@
+import Link from "next/link";
+
 export default function AboutPage() {
   return (
     <main className="shell">
-      <header className="header"><a className="wordmark" href="/">DeepScout</a></header>
+      <header className="header"><Link className="wordmark" href="/">DeepScout</Link></header>
       <article className="hero">
         <div className="eyebrow">Methodology</div>
         <h1>Small, bounded research runs.</h1>
