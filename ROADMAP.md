@@ -2,15 +2,17 @@
 
 ## Current implementation status
 
-Phase 1 and Phase 2 are implemented in the local MVP:
+Phase 1 through Phase 4 are implemented in the local MVP:
 
 - `apps/api`: bounded planner → search → safe fetch → extraction → evidence → synthesis → citation verification pipeline;
 - `apps/web`: research composer, stage progress, result report, inline citations, and source cards;
 - Phase 2 controls: HMAC identity keys, burst limits, daily run quotas, concurrency reservations, token budgets, bounded fetches, transient retries, optional LLM fallback, and structured errors;
 - deterministic demo providers allow the full flow and tests to run without paid API keys;
 - `infra/sql/001_initial.sql` is prepared for managed Postgres deployment.
+- Phase 3 UX: live stage telemetry, loading skeletons, responsive report/source layout, citation highlighting/tooltips, keyboard shortcuts, reduced-motion support, automatic dark mode, and share-link copying;
+- Phase 4 evals: 32 curated cases, deterministic citation/retrieval/latency/token metrics, checked-in baseline, CI regression gate, and a measured evidence-coverage improvement.
 
-The default local repository is intentionally single-process in-memory so the MVP runs without infrastructure. Postgres repository wiring, auth/history, deployment, and evals remain future hardening work before claiming the production exit criteria.
+The default local repository is intentionally single-process in-memory so the MVP runs without infrastructure. Postgres repository wiring, auth/history, and deployment remain future hardening work before claiming the production exit criteria.
 
 ## Phase 0 — repository foundation
 

@@ -130,7 +130,7 @@ Run the validation suite from the repository root:
 cd apps/web && npm run lint && npm run typecheck && npm run build && npm audit
 ```
 
-The API currently uses an in-memory repository for local/demo execution. The initial Postgres schema is in `infra/sql/001_initial.sql`; persistent repository wiring is intentionally separate from the Phase 1–2 local MVP.
+The API currently uses an in-memory repository for local/demo execution. The initial Postgres schema is in `infra/sql/001_initial.sql`; persistent repository wiring, auth/history, and deployment remain separate follow-up work.
 
 ## Deterministic benchmark
 

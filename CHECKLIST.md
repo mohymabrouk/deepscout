@@ -1,6 +1,6 @@
 # Build Checklist
 
-## Phase 1–2 implementation note
+## Phase 1–4 implementation note
 
 The checked implementation items below run locally against deterministic demo providers. Items involving managed persistence, authentication, deployment, or live evals are not marked complete until their external integrations are wired and validated.
 
@@ -52,6 +52,16 @@ The checked implementation items below run locally against deterministic demo pr
 - [ ] Accessibility pass (baseline semantics present; full audit remains)
 - [ ] History page
 
+## Phase 3 UX
+
+- [x] Stage streaming telemetry
+- [x] Skeleton/loading state
+- [x] Citation hover/focus metadata and source highlighting
+- [x] Keyboard shortcuts
+- [x] Reduced-motion support
+- [x] Automatic dark mode
+- [x] Shareable run URL and copy-link action
+
 ## Database
 
 - [ ] `research_runs`
@@ -88,14 +98,15 @@ The checked implementation items below run locally against deterministic demo pr
 
 ## Evals
 
-- [ ] 30+ cases
-- [ ] Completion metric
-- [ ] Citation validity metric
-- [ ] Citation coverage metric
-- [ ] Source diversity metric
-- [ ] Token usage metric
-- [ ] Latency metric
-- [ ] Regression report
+- [x] 30+ cases
+- [x] Completion metric
+- [x] Citation validity metric
+- [x] Citation coverage metric
+- [x] Source diversity metric
+- [x] Token usage metric
+- [x] Latency metric
+- [x] Regression report
+- [x] CI regression gate
 
 ## Deployment
 
