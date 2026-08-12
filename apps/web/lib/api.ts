@@ -13,6 +13,11 @@ export type Source = {
   url: string;
   domain: string;
   retrieved_at: string;
+  quality?: {
+    score: number;
+    label: "high" | "medium" | "low";
+    reasons: string[];
+  };
 };
 
 export type Paragraph = { text: string; citations: number[] };
