@@ -1,7 +1,8 @@
-"""A small repository abstraction with an in-memory implementation for the MVP.
+"""Run storage contracts and the local in-memory implementation.
 
-The interface is deliberately storage-neutral so a Postgres repository can replace it
-without changing the API or research pipeline.
+The API only accesses runs through ownership-aware repository methods. The in-memory
+implementation keeps local development infrastructure-free while the same contract is
+used by the Postgres adapter when ``DATABASE_URL`` is configured.
 """
 
 from __future__ import annotations
@@ -23,9 +24,12 @@ class RunRecord:
     id: str
     question: str
     identity_key: str
+    user_id: str | None = None
     status: str = "pending"
     report: ResearchReport | None = None
     sources: list[Source] = field(default_factory=list)
+    source_count: int = 0
+    title: str | None = None
     usage: Usage | None = None
     search_calls: int = 0
     error_code: str | None = None
@@ -40,10 +44,15 @@ class RunRecord:
 class InMemoryRunRepository:
     def __init__(self) -> None:
         self._runs: dict[str, RunRecord] = {}
+        self._idempotency: dict[tuple[str, str], str] = {}
         self._lock = asyncio.Lock()
 
-    async def create(self, question: str, identity_key: str) -> RunRecord:
-        record = RunRecord(id=f"run_{uuid4().hex}", question=question, identity_key=identity_key)
+    async def create(
+        self, question: str, identity_key: str, user_id: str | None = None
+    ) -> RunRecord:
+        record = RunRecord(
+            id=str(uuid4()), question=question, identity_key=identity_key, user_id=user_id
+        )
         async with self._lock:
             self._runs[record.id] = record
         return record
@@ -51,6 +60,21 @@ class InMemoryRunRepository:
     async def get(self, run_id: str) -> RunRecord | None:
         async with self._lock:
             return self._runs.get(run_id)
+
+    @staticmethod
+    def _owns(record: RunRecord, identity_key: str, user_id: str | None) -> bool:
+        if user_id is not None:
+            return record.user_id == user_id
+        return record.user_id is None and record.identity_key == identity_key
+
+    async def get_owned(
+        self, run_id: str, identity_key: str, user_id: str | None
+    ) -> RunRecord | None:
+        async with self._lock:
+            record = self._runs.get(run_id)
+            if record is None or not self._owns(record, identity_key, user_id):
+                return None
+            return record
 
     async def update_status(self, run_id: str, status: str) -> None:
         async with self._lock:
@@ -68,6 +92,8 @@ class InMemoryRunRepository:
             run.status = "completed"
             run.report = report
             run.sources = sources
+            run.source_count = len(sources)
+            run.title = report.title
             run.usage = usage
 
     async def increment_search_calls(self, run_id: str) -> None:
@@ -112,3 +138,46 @@ class InMemoryRunRepository:
     async def all_for_identity(self, identity_key: str) -> list[RunRecord]:
         async with self._lock:
             return [run for run in self._runs.values() if run.identity_key == identity_key]
+
+    async def list_for_user(
+        self,
+        user_id: str,
+        limit: int,
+        before: tuple[datetime, str] | None = None,
+    ) -> tuple[list[RunRecord], tuple[datetime, str] | None]:
+        async with self._lock:
+            runs = sorted(
+                (run for run in self._runs.values() if run.user_id == user_id),
+                key=lambda run: (run.created_at, run.id),
+                reverse=True,
+            )
+            if before is not None:
+                runs = [
+                    run
+                    for run in runs
+                    if (run.created_at, run.id) < before
+                ]
+            page = runs[:limit]
+            has_more = len(runs) > limit
+            next_before = (page[-1].created_at, page[-1].id) if has_more and page else None
+            return page, next_before
+
+    async def delete_owned(
+        self, run_id: str, identity_key: str, user_id: str | None
+    ) -> bool:
+        async with self._lock:
+            record = self._runs.get(run_id)
+            if record is None or not self._owns(record, identity_key, user_id):
+                return False
+            del self._runs[run_id]
+            return True
+
+    async def get_idempotency(self, identity_key: str, idempotency_key: str) -> str | None:
+        async with self._lock:
+            return self._idempotency.get((identity_key, idempotency_key))
+
+    async def save_idempotency(
+        self, identity_key: str, idempotency_key: str, run_id: str
+    ) -> None:
+        async with self._lock:
+            self._idempotency.setdefault((identity_key, idempotency_key), run_id)

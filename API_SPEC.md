@@ -49,6 +49,10 @@ Authorization: Bearer <optional Supabase JWT>
 Idempotency-Key: <optional uuid>
 ```
 
+When enabled, the API accepts only a Supabase access token signed with the configured
+JWT secret, issuer/audience, expiry, UUID subject, and `role=authenticated`. The server
+derives ownership from the token `sub` claim; request bodies never select a user.
+
 Success: `202 Accepted`
 
 ```json
@@ -123,7 +127,13 @@ cursor=<opaque>
 
 Returns compact run metadata, not all source text.
 
-## 7. `GET /v1/usage`
+## 7. `DELETE /v1/runs/{run_id}`
+
+Authenticated or anonymous owner only. Deletes the run and its sources/events through
+the database foreign-key cascade. A run owned by another user is indistinguishable from
+a missing run and returns `404`.
+
+## 8. `GET /v1/usage`
 
 Response:
 

@@ -15,6 +15,11 @@ class Settings(BaseSettings):
     api_public_url: str = "http://localhost:8000"
     database_url: str | None = None
     anon_id_hmac_secret: str = Field(default="local-development-secret", min_length=16)
+    supabase_url: str | None = None
+    supabase_jwt_secret: str | None = None
+    supabase_jwt_audience: str = "authenticated"
+    enable_auth: bool = False
+    enable_history: bool = True
 
     llm_provider: str = "demo"
     llm_api_key: str | None = None

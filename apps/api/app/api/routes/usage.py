@@ -2,7 +2,6 @@ from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Request
 
-from app.core.security import request_identity
 from app.schemas.research import UsageResponse
 
 router = APIRouter(prefix="/v1", tags=["usage"])
@@ -10,11 +9,8 @@ router = APIRouter(prefix="/v1", tags=["usage"])
 
 @router.get("/usage", response_model=UsageResponse)
 async def usage(request: Request) -> UsageResponse:
-    identity, authenticated = request_identity(
-        request.headers.get("Authorization"),
-        request.client.host if request.client else "unknown",
-        request.app.state.settings.anon_id_hmac_secret,
-    )
+    identity = request.state.identity_key
+    authenticated = request.state.authenticated
     current = await request.app.state.quota_service.get(identity)
     now = datetime.now(UTC)
     reset = datetime.combine(now.date() + timedelta(days=1), datetime.min.time(), tzinfo=UTC)

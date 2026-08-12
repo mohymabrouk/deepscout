@@ -8,7 +8,6 @@ from fastapi import APIRouter, Header, Request
 from fastapi.responses import StreamingResponse
 
 from app.core.errors import RUN_NOT_FOUND, RUN_TIMEOUT, DomainError
-from app.core.security import request_identity
 from app.db.repository import TERMINAL_STATUSES
 from app.schemas.events import RunEvent
 from app.schemas.research import ResearchAccepted, ResearchRequest, ResearchResult
@@ -50,6 +49,7 @@ async def _execute(request: Request, run_id: str, question: str, identity_key: s
             record.search_calls if record else 0,
         )
         request.app.state.tasks.discard(asyncio.current_task())
+        request.app.state.run_tasks.pop(run_id, None)
 
 
 @router.post("", response_model=ResearchAccepted, status_code=202)
@@ -62,31 +62,31 @@ async def create_research(
         raise DomainError(
             "QUESTION_TOO_LONG", "Question exceeds the configured character limit.", 400
         )
-    identity_key, authenticated = request_identity(
-        request.headers.get("Authorization"),
-        request.client.host if request.client else "unknown",
-        request.app.state.settings.anon_id_hmac_secret,
-    )
+    identity_key = request.state.identity_key
+    authenticated = request.state.authenticated
     if idempotency_key:
-        existing = getattr(request.app.state, "idempotency", {}).get(
-            (identity_key, idempotency_key)
-        )
+        existing = await request.app.state.repository.get_idempotency(identity_key, idempotency_key)
         if existing:
-            return ResearchAccepted(
-                run_id=existing, status="pending", events_url=f"/v1/research/{existing}/events"
+            record = await request.app.state.repository.get_owned(
+                existing, identity_key, request.state.user_id
             )
+            if record:
+                return ResearchAccepted(
+                    run_id=existing, status="pending", events_url=f"/v1/research/{existing}/events"
+                )
     await request.app.state.quota_service.reserve_run(
         identity_key,
         request.app.state.settings.auth_runs_per_day if authenticated else request.app.state.settings.anon_runs_per_day,
         request.app.state.settings.auth_concurrent_runs if authenticated else request.app.state.settings.anon_concurrent_runs,
     )
-    record = await request.app.state.repository.create(body.question, identity_key)
-    if not hasattr(request.app.state, "idempotency"):
-        request.app.state.idempotency = {}
+    record = await request.app.state.repository.create(
+        body.question, identity_key, request.state.user_id
+    )
     if idempotency_key:
-        request.app.state.idempotency[(identity_key, idempotency_key)] = record.id
+        await request.app.state.repository.save_idempotency(identity_key, idempotency_key, record.id)
     task = asyncio.create_task(_execute(request, record.id, body.question, identity_key))
     request.app.state.tasks.add(task)
+    request.app.state.run_tasks[record.id] = task
     return ResearchAccepted(
         run_id=record.id, status="pending", events_url=f"/v1/research/{record.id}/events"
     )
@@ -94,7 +94,9 @@ async def create_research(
 
 @router.get("/{run_id}", response_model=ResearchResult)
 async def get_research(request: Request, run_id: str) -> ResearchResult:
-    record = await request.app.state.repository.get(run_id)
+    record = await request.app.state.repository.get_owned(
+        run_id, request.state.identity_key, request.state.user_id
+    )
     if record is None:
         raise DomainError(RUN_NOT_FOUND, "Research run not found.", 404)
     return _result(record)
@@ -106,14 +108,18 @@ def _sse(event: RunEvent) -> str:
 
 @router.get("/{run_id}/events")
 async def research_events(request: Request, run_id: str) -> StreamingResponse:
-    record = await request.app.state.repository.get(run_id)
+    record = await request.app.state.repository.get_owned(
+        run_id, request.state.identity_key, request.state.user_id
+    )
     if record is None:
         raise DomainError(RUN_NOT_FOUND, "Research run not found.", 404)
 
     async def stream() -> AsyncIterator[str]:
         offset = 0
         while True:
-            current = await request.app.state.repository.get(run_id)
+            current = await request.app.state.repository.get_owned(
+                run_id, request.state.identity_key, request.state.user_id
+            )
             if current is None:
                 return
             events = await request.app.state.repository.list_events(run_id, offset)

@@ -3,6 +3,19 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+RunStatus = Literal[
+    "pending",
+    "planning",
+    "searching",
+    "fetching",
+    "selecting",
+    "synthesizing",
+    "verifying",
+    "completed",
+    "failed",
+    "limited",
+]
+
 
 class ResearchRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -60,23 +73,27 @@ class Usage(BaseModel):
 
 class ResearchResult(BaseModel):
     id: str
-    status: Literal[
-        "pending",
-        "planning",
-        "searching",
-        "fetching",
-        "selecting",
-        "synthesizing",
-        "verifying",
-        "completed",
-        "failed",
-        "limited",
-    ]
+    status: RunStatus
     question: str | None = None
     report: ResearchReport | None = None
     sources: list[Source] = Field(default_factory=list)
     usage: Usage | None = None
     error_code: str | None = None
+
+
+class RunSummary(BaseModel):
+    id: str
+    status: RunStatus
+    question: str
+    title: str | None = None
+    source_count: int = 0
+    created_at: datetime
+    completed_at: datetime | None = None
+
+
+class RunListResponse(BaseModel):
+    items: list[RunSummary]
+    next_cursor: str | None = None
 
 
 class UsageResponse(BaseModel):

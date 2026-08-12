@@ -23,6 +23,7 @@ LLM_API_KEY
 LLM_FALLBACK_API_KEY
 SEARCH_API_KEY
 SUPABASE_SERVICE_ROLE_KEY
+SUPABASE_JWT_SECRET
 ANON_ID_HMAC_SECRET
 ```
 
@@ -91,9 +92,13 @@ Do not use `*` together with credentialed requests.
 If Supabase Auth is enabled:
 
 - validate JWT server-side;
-- verify issuer/audience as appropriate;
+- verify HS256 signature, issuer, audience, expiry, UUID subject, and `role=authenticated`;
 - derive `user_id` from validated token, never from request body;
 - anonymous mode remains a separate code path.
+
+The browser uses only `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`.
+The JWT secret and service-role key remain API-only. History, result, event, and delete
+queries all apply the verified owner ID in the database predicate.
 
 ## 7. Data exposure
 
@@ -103,6 +108,9 @@ Run access rules:
 authenticated run -> owner only unless explicitly shared
 anonymous run -> only accessible through high-entropy run ID for short retention
 ```
+
+The API additionally binds anonymous reads to the HMAC identity derived from the client
+network prefix. Authenticated runs are bound to the verified Supabase user ID.
 
 For a public share feature later, use an explicit `share_token` rather than making all run IDs public by default.
 
