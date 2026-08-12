@@ -397,12 +397,12 @@ class PostgresRunRepository:
                         [
                             (
                                 UUID(run_id),
-                                source_ids.get(item.source_index),
-                                item.source_index,
+                                source_ids.get(citation_id),
+                                citation_id,
                                 item.excerpt,
                                 item.relevance_score,
                             )
-                            for item in evidence
+                            for citation_id, item in enumerate(evidence, start=1)
                         ],
                     )
 
