@@ -6,6 +6,7 @@ from datetime import datetime
 from typing import Any
 from uuid import UUID, uuid4
 
+from app.core.errors import IDEMPOTENCY_CONFLICT, DomainError
 from app.db.repository import RunRecord
 from app.research.models import RunMetrics, StageTiming
 from app.schemas.events import RunEvent
@@ -424,3 +425,66 @@ class PostgresRunRepository:
                 idempotency_key,
                 UUID(run_id),
             )
+
+    async def get_or_create_idempotent(
+        self,
+        question: str | None,
+        identity_key: str,
+        user_id: str | None,
+        idempotency_key: str,
+        request_hash: str,
+    ) -> tuple[RunRecord, bool]:
+        pool = await self._get_pool()
+        async with pool.acquire() as connection:
+            async with connection.transaction():
+                run_id = uuid4()
+                row = await connection.fetchrow(
+                    """
+                    insert into research_runs (id, user_id, anonymous_key, question, status)
+                    values ($1, $2, $3, $4, 'pending')
+                    on conflict do nothing
+                    returning *, 0::integer as source_count
+                    """,
+                    run_id,
+                    UUID(user_id) if user_id else None,
+                    identity_key if user_id is None else None,
+                    question,
+                )
+                if row is not None:
+                    claimed = await connection.fetchrow(
+                        """
+                        insert into idempotency_keys
+                            (identity_key, idempotency_key, run_id, request_hash)
+                        values ($1, $2, $3, $4)
+                        on conflict (identity_key, idempotency_key) do nothing
+                        returning run_id
+                        """,
+                        identity_key,
+                        idempotency_key,
+                        run_id,
+                        request_hash,
+                    )
+                    if claimed is not None:
+                        return self._record(row), True
+                    await connection.execute(
+                        "delete from research_runs where id = $1", run_id
+                    )
+                existing = await connection.fetchrow(
+                    """
+                    select r.*, 0::integer as source_count, i.request_hash
+                    from idempotency_keys i
+                    join research_runs r on r.id = i.run_id
+                    where i.identity_key = $1 and i.idempotency_key = $2
+                    """,
+                    identity_key,
+                    idempotency_key,
+                )
+                if existing is None:
+                    raise RuntimeError("Idempotency claim disappeared during transaction")
+                if existing["request_hash"] and existing["request_hash"] != request_hash:
+                    raise DomainError(
+                        IDEMPOTENCY_CONFLICT,
+                        "The idempotency key was already used for a different request.",
+                        409,
+                    )
+                return self._record(existing), False

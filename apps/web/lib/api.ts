@@ -117,7 +117,7 @@ export function subscribeToEvents(runId: string, accessToken: string | null, onE
 export type RunSummary = {
   id: string;
   status: string;
-  question: string;
+  question?: string;
   title?: string;
   source_count: number;
   created_at: string;

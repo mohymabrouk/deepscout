@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
 from collections.abc import AsyncIterator
 
@@ -64,31 +65,50 @@ async def create_research(
         )
     identity_key = request.state.identity_key
     authenticated = request.state.authenticated
-    if idempotency_key:
-        existing = await request.app.state.repository.get_idempotency(identity_key, idempotency_key)
-        if existing:
-            record = await request.app.state.repository.get_owned(
-                existing, identity_key, request.state.user_id
+    if idempotency_key is not None:
+        if not idempotency_key or len(idempotency_key) > 200 or any(
+            ord(char) < 33 or ord(char) > 126 for char in idempotency_key
+        ):
+            raise DomainError(
+                "INVALID_REQUEST", "Idempotency-Key must be a printable value up to 200 characters.", 400
             )
-            if record:
-                return ResearchAccepted(
-                    run_id=existing, status="pending", events_url=f"/v1/research/{existing}/events"
-                )
+    request_hash = hashlib.sha256(
+        json.dumps(body.model_dump(mode="json"), sort_keys=True, separators=(",", ":")).encode()
+    ).hexdigest()
+    stored_question = body.question if request.app.state.settings.store_question_text else None
     await request.app.state.quota_service.reserve_run(
         identity_key,
         request.app.state.settings.auth_runs_per_day if authenticated else request.app.state.settings.anon_runs_per_day,
         request.app.state.settings.auth_concurrent_runs if authenticated else request.app.state.settings.anon_concurrent_runs,
     )
-    record = await request.app.state.repository.create(
-        body.question, identity_key, request.state.user_id
-    )
     if idempotency_key:
-        await request.app.state.repository.save_idempotency(identity_key, idempotency_key, record.id)
+        try:
+            record, created = await request.app.state.repository.get_or_create_idempotent(
+                stored_question,
+                identity_key,
+                request.state.user_id,
+                idempotency_key,
+                request_hash,
+            )
+        except Exception:
+            await request.app.state.quota_service.finish_run(identity_key)
+            raise
+        if not created:
+            await request.app.state.quota_service.finish_run(identity_key)
+            return ResearchAccepted(
+                run_id=record.id,
+                status=record.status,
+                events_url=f"/v1/research/{record.id}/events",
+            )
+    else:
+        record = await request.app.state.repository.create(
+            stored_question, identity_key, request.state.user_id
+        )
     task = asyncio.create_task(_execute(request, record.id, body.question, identity_key))
     request.app.state.tasks.add(task)
     request.app.state.run_tasks[record.id] = task
     return ResearchAccepted(
-        run_id=record.id, status="pending", events_url=f"/v1/research/{record.id}/events"
+        run_id=record.id, status=record.status, events_url=f"/v1/research/{record.id}/events"
     )
 
 

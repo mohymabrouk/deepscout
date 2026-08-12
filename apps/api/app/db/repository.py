@@ -12,6 +12,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from uuid import uuid4
 
+from app.core.errors import IDEMPOTENCY_CONFLICT, DomainError
 from app.research.models import RunMetrics, StageTiming
 from app.schemas.events import RunEvent
 from app.schemas.research import ResearchReport, Source, Usage
@@ -22,7 +23,7 @@ TERMINAL_STATUSES = {"completed", "failed", "limited"}
 @dataclass
 class RunRecord:
     id: str
-    question: str
+    question: str | None
     identity_key: str
     user_id: str | None = None
     status: str = "pending"
@@ -44,7 +45,7 @@ class RunRecord:
 class InMemoryRunRepository:
     def __init__(self) -> None:
         self._runs: dict[str, RunRecord] = {}
-        self._idempotency: dict[tuple[str, str], str] = {}
+        self._idempotency: dict[tuple[str, str], tuple[str, str]] = {}
         self._lock = asyncio.Lock()
 
     async def create(
@@ -174,13 +175,47 @@ class InMemoryRunRepository:
 
     async def get_idempotency(self, identity_key: str, idempotency_key: str) -> str | None:
         async with self._lock:
-            return self._idempotency.get((identity_key, idempotency_key))
+            item = self._idempotency.get((identity_key, idempotency_key))
+            return item[0] if item else None
 
     async def save_idempotency(
         self, identity_key: str, idempotency_key: str, run_id: str
     ) -> None:
         async with self._lock:
-            self._idempotency.setdefault((identity_key, idempotency_key), run_id)
+            self._idempotency.setdefault((identity_key, idempotency_key), (run_id, ""))
+
+    async def get_or_create_idempotent(
+        self,
+        question: str | None,
+        identity_key: str,
+        user_id: str | None,
+        idempotency_key: str,
+        request_hash: str,
+    ) -> tuple[RunRecord, bool]:
+        async with self._lock:
+            key = (identity_key, idempotency_key)
+            existing = self._idempotency.get(key)
+            if existing is not None:
+                existing_run_id, existing_hash = existing
+                if existing_hash and existing_hash != request_hash:
+                    raise DomainError(
+                        IDEMPOTENCY_CONFLICT,
+                        "The idempotency key was already used for a different request.",
+                        409,
+                    )
+                record = self._runs.get(existing_run_id)
+                if record is not None:
+                    return record, False
+                self._idempotency.pop(key, None)
+            record = RunRecord(
+                id=str(uuid4()),
+                question=question,
+                identity_key=identity_key,
+                user_id=user_id,
+            )
+            self._runs[record.id] = record
+            self._idempotency[key] = (record.id, request_hash)
+            return record, True
 
     async def ready(self) -> bool:
         return True

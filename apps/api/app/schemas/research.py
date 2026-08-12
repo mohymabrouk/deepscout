@@ -36,7 +36,7 @@ class ResearchRequest(BaseModel):
 
 class ResearchAccepted(BaseModel):
     run_id: str
-    status: Literal["pending"]
+    status: RunStatus
     events_url: str
 
 
@@ -98,7 +98,7 @@ class ResearchResult(BaseModel):
 class RunSummary(BaseModel):
     id: str
     status: RunStatus
-    question: str
+    question: str | None = None
     title: str | None = None
     source_count: int = 0
     created_at: datetime

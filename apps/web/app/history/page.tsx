@@ -71,7 +71,7 @@ export default function HistoryPage() {
         {loading && <p className="auth-note">Loading history…</p>}
         {error && <p className="error" role="alert">{error}</p>}
         {token && !loading && runs.length === 0 && <p className="empty-state">No saved runs yet. Start a research brief to see it here.</p>}
-        {token && runs.length > 0 && <><div className="history-list">{runs.map((run) => <article className="history-row" key={run.id}><Link href={`/r/${run.id}`}><span className="history-status">{run.status}</span><h2>{run.title || run.question}</h2><p>{run.question}</p><small>{new Date(run.created_at).toLocaleString()} · {run.source_count} sources</small></Link><button className="quiet-button" type="button" onClick={() => remove(run)}>Delete</button></article>)}</div>{nextCursor && <button className="quiet-button load-more" type="button" onClick={loadMore} disabled={loadingMore}>{loadingMore ? "Loading…" : "Load more"}</button>}</>}
+        {token && runs.length > 0 && <><div className="history-list">{runs.map((run) => <article className="history-row" key={run.id}><Link href={`/r/${run.id}`}><span className="history-status">{run.status}</span><h2>{run.title || run.question || "Research run"}</h2><p>{run.question || "Question text was not stored."}</p><small>{new Date(run.created_at).toLocaleString()} · {run.source_count} sources</small></Link><button className="quiet-button" type="button" onClick={() => remove(run)}>Delete</button></article>)}</div>{nextCursor && <button className="quiet-button load-more" type="button" onClick={loadMore} disabled={loadingMore}>{loadingMore ? "Loading…" : "Load more"}</button>}</>}
       </section>
     </main>
   );
