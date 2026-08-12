@@ -101,7 +101,12 @@ Response:
       "title": "...",
       "url": "https://example.com/...",
       "domain": "example.com",
-      "retrieved_at": "2026-08-12T10:00:00Z"
+      "retrieved_at": "2026-08-12T10:00:00Z",
+      "quality": {
+        "score": 0.82,
+        "label": "high",
+        "reasons": ["HTTPS transport was used.", "The source provides a descriptive title."]
+      }
     }
   ],
   "usage": {
@@ -113,6 +118,10 @@ Response:
 ```
 
 Usage may be hidden from normal users and visible only in debug/admin mode.
+
+`quality` contains deterministic, explainable signals from transport, publisher domain,
+response status, extractable text, and title/language cues. It is not a factual-truth
+guarantee or an endorsement of the publisher.
 
 ## 6. `GET /v1/runs`
 

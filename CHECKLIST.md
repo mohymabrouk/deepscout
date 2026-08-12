@@ -63,6 +63,13 @@ The checked implementation items below run locally against deterministic demo pr
 - [x] Automatic dark mode
 - [x] Shareable run URL and copy-link action
 
+## Phase 6 extras
+
+- [x] Explainable source-quality classifier
+- [x] Persisted quality score, label, and reasons
+- [x] Quality signals rendered beside source cards
+- [x] Quality classifier unit and pipeline tests
+
 ## Database
 
 - [ ] `research_runs`

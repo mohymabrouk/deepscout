@@ -39,10 +39,14 @@ export default function ReportView({ report, sources }: { report: Report; source
       <details className="sources-panel" open>
         <summary>Sources <span>{sources.length}</span></summary>
         <aside className="sources" aria-label="Sources">
-          {sources.map((source) => <a className={`source-card${highlightedSource === source.citation_id ? " highlighted" : ""}`} id={`source-${source.citation_id}`} href={source.url} target="_blank" rel="noopener noreferrer" key={source.citation_id}>
+          <p className="quality-disclaimer">Quality labels are explainable signals, not a guarantee that a source is correct.</p>
+          {sources.map((source) => {
+            const quality = source.quality ?? { score: 0.5, label: "medium" as const, reasons: ["Quality signals were not available."] };
+            return <a className={`source-card${highlightedSource === source.citation_id ? " highlighted" : ""}`} id={`source-${source.citation_id}`} href={source.url} target="_blank" rel="noopener noreferrer" key={source.citation_id}>
             <span className="source-number">{source.citation_id}</span>
-            <span><strong>{source.title}</strong><small>{source.domain}</small></span>
-          </a>)}
+            <span><strong>{source.title}</strong><small>{source.domain}</small><span className={`quality-badge quality-${quality.label}`} title={quality.reasons.join(" ")}>{quality.label} signal · {Math.round(quality.score * 100)}%</span></span>
+          </a>;
+          })}
         </aside>
       </details>
     </div>

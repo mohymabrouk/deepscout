@@ -27,6 +27,7 @@ def test_demo_orchestrator_completes_with_sources_and_events():
 
         assert result["status"] == "completed"
         assert len(result["sources"]) >= 1
+        assert all(source["quality"]["label"] in {"high", "medium", "low"} for source in result["sources"])
         assert result["report"]["sections"][0]["paragraphs"][0]["citations"]
         assert result["usage"]["llm_calls"] == 2
 
