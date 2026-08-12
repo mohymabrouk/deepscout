@@ -13,7 +13,7 @@ from datetime import UTC, datetime
 from uuid import uuid4
 
 from app.core.errors import IDEMPOTENCY_CONFLICT, DomainError
-from app.research.models import RunMetrics, StageTiming
+from app.research.models import EvidencePassage, RunMetrics, StageTiming
 from app.schemas.events import RunEvent
 from app.schemas.research import ResearchReport, Source, Usage
 
@@ -35,6 +35,7 @@ class RunRecord:
     search_calls: int = 0
     error_code: str | None = None
     events: list[RunEvent] = field(default_factory=list)
+    evidence_passages: list[EvidencePassage] = field(default_factory=list)
     created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     metrics: RunMetrics = field(init=False)
 
@@ -86,7 +87,12 @@ class InMemoryRunRepository:
             self._runs[run_id].events.append(event)
 
     async def complete(
-        self, run_id: str, report: ResearchReport, sources: list[Source], usage: Usage
+        self,
+        run_id: str,
+        report: ResearchReport,
+        sources: list[Source],
+        usage: Usage,
+        evidence: list[EvidencePassage] | None = None,
     ) -> None:
         async with self._lock:
             run = self._runs[run_id]
@@ -96,6 +102,7 @@ class InMemoryRunRepository:
             run.source_count = len(sources)
             run.title = report.title
             run.usage = usage
+            run.evidence_passages = list(evidence or [])
 
     async def increment_search_calls(self, run_id: str) -> None:
         async with self._lock:

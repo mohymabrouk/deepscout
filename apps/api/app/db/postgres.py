@@ -8,7 +8,7 @@ from uuid import UUID, uuid4
 
 from app.core.errors import IDEMPOTENCY_CONFLICT, DomainError
 from app.db.repository import RunRecord
-from app.research.models import RunMetrics, StageTiming
+from app.research.models import EvidencePassage, RunMetrics, StageTiming
 from app.schemas.events import RunEvent
 from app.schemas.research import ResearchReport, Source, SourceQuality, Usage
 
@@ -244,7 +244,12 @@ class PostgresRunRepository:
             )
 
     async def complete(
-        self, run_id: str, report: ResearchReport, sources: list[Source], usage: Usage
+        self,
+        run_id: str,
+        report: ResearchReport,
+        sources: list[Source],
+        usage: Usage,
+        evidence: list[EvidencePassage] | None = None,
     ) -> None:
         pool = await self._get_pool()
         async with pool.acquire() as connection:
@@ -286,6 +291,34 @@ class PostgresRunRepository:
                         for source in sources
                     ],
                 )
+                await connection.execute(
+                    "delete from evidence_passages where run_id = $1", UUID(run_id)
+                )
+                if evidence:
+                    source_rows = await connection.fetch(
+                        "select id, citation_id from sources where run_id = $1",
+                        UUID(run_id),
+                    )
+                    source_ids = {
+                        row["citation_id"]: row["id"] for row in source_rows
+                    }
+                    await connection.executemany(
+                        """
+                        insert into evidence_passages
+                            (run_id, source_id, citation_id, excerpt, relevance_score)
+                        values ($1, $2, $3, $4, $5)
+                        """,
+                        [
+                            (
+                                UUID(run_id),
+                                source_ids.get(item.source_index),
+                                item.source_index,
+                                item.excerpt,
+                                item.relevance_score,
+                            )
+                            for item in evidence
+                        ],
+                    )
 
     async def increment_search_calls(self, run_id: str) -> None:
         pool = await self._get_pool()

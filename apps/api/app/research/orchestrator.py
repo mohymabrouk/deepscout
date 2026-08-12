@@ -128,6 +128,7 @@ class ResearchOrchestrator:
                 report,
                 sources,
                 Usage(input_tokens=input_tokens, output_tokens=output_tokens, llm_calls=llm_calls),
+                evidence,
             )
             await self.repository.finalize_metrics(run_id, datetime.now(UTC), budget)
             await self.repository.append_event(
