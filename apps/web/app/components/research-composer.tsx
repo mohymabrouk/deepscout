@@ -46,8 +46,9 @@ export default function ResearchComposer() {
   return (
     <>
       <form className="composer" onSubmit={submit} aria-label="Research question">
-        <textarea ref={textareaRef} aria-label="Research question" aria-keyshortcuts="Control+Enter Meta+Enter" value={question} onChange={(event) => { setQuestion(event.target.value); resizeTextarea(); }} onKeyDown={onKeyDown} maxLength={1500} placeholder="What would you like to investigate?" required minLength={10} disabled={submitting} />
-        <div className="composer-footer"><span className="hint">Cmd/Ctrl + Enter to research · Esc to clear</span><span className="character-count" aria-live="polite">{question.length > 1300 ? `${question.length}/1500` : ""}</span><button className="primary" type="submit" disabled={submitting}>{submitting ? "Starting…" : "Research"}</button></div>
+        <label className="sr-only" htmlFor="research-question">Research question</label>
+        <textarea id="research-question" ref={textareaRef} aria-describedby="research-question-hint" aria-keyshortcuts="Control+Enter Meta+Enter" value={question} onChange={(event) => { setQuestion(event.target.value); resizeTextarea(); }} onKeyDown={onKeyDown} maxLength={1500} placeholder="What would you like to investigate?" required minLength={10} disabled={submitting} />
+        <div className="composer-footer"><span className="hint" id="research-question-hint">Cmd/Ctrl + Enter to research · Esc to clear</span><span className="character-count" aria-live="polite">{question.length > 1300 ? `${question.length}/1500` : ""}</span><button className="primary" type="submit" disabled={submitting}>{submitting ? "Starting…" : "Research"}</button></div>
       </form>
       {error && <p className="error" role="alert">{error}</p>}
       <div className="examples" aria-label="Example questions"><span>Try:</span>{examples.map((example) => <button key={example} type="button" onClick={() => { setQuestion(example); requestAnimationFrame(resizeTextarea); }}>{example}</button>)}</div>
