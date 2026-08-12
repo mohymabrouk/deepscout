@@ -13,6 +13,7 @@ from app.research.evidence import EvidenceSelector
 from app.research.fetcher import SafeFetcher
 from app.research.models import SearchResult
 from app.research.planner import Planner
+from app.research.quality import SourceQualityClassifier
 from app.research.synthesizer import Synthesizer
 from app.research.verifier import CitationVerifier
 from app.schemas.events import RunEvent
@@ -117,6 +118,7 @@ class ResearchOrchestrator:
                     url=item.source.url,
                     domain=item.source.domain,
                     retrieved_at=item.source.retrieved_at,
+                    quality=SourceQualityClassifier().classify(item.source),
                 )
                 for index, item in enumerate(evidence, start=1)
             ]

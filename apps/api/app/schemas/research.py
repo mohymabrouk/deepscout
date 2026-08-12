@@ -40,12 +40,26 @@ class ResearchAccepted(BaseModel):
     events_url: str
 
 
+QualityLabel = Literal["high", "medium", "low"]
+
+
+class SourceQuality(BaseModel):
+    score: float = Field(ge=0, le=1)
+    label: QualityLabel
+    reasons: list[str] = Field(default_factory=list, max_length=5)
+
+
 class Source(BaseModel):
     citation_id: int
     title: str
     url: str
     domain: str
     retrieved_at: datetime
+    quality: SourceQuality = Field(
+        default_factory=lambda: SourceQuality(
+            score=0.5, label="medium", reasons=["Quality signals were not available."]
+        )
+    )
 
 
 class ReportParagraph(BaseModel):
