@@ -1,0 +1,2 @@
+"""DeepScout API application."""
+

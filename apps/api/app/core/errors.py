@@ -1,0 +1,29 @@
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import Any
+
+
+@dataclass
+class DomainError(Exception):
+    code: str
+    message: str
+    status_code: int = 400
+    retry_after_seconds: int | None = None
+    details: dict[str, Any] | None = None
+
+
+INVALID_REQUEST = "INVALID_REQUEST"
+QUESTION_TOO_LONG = "QUESTION_TOO_LONG"
+DAILY_RUN_LIMIT = "DAILY_RUN_LIMIT"
+TOKEN_BUDGET_EXCEEDED = "TOKEN_BUDGET_EXCEEDED"
+CONCURRENCY_LIMIT = "CONCURRENCY_LIMIT"
+PROVIDER_RATE_LIMIT = "PROVIDER_RATE_LIMIT"
+PROVIDER_UNAVAILABLE = "PROVIDER_UNAVAILABLE"
+SEARCH_UNAVAILABLE = "SEARCH_UNAVAILABLE"
+INSUFFICIENT_SOURCES = "INSUFFICIENT_SOURCES"
+RUN_TIMEOUT = "RUN_TIMEOUT"
+RUN_NOT_FOUND = "RUN_NOT_FOUND"
+UNAUTHORIZED = "UNAUTHORIZED"
+INTERNAL_ERROR = "INTERNAL_ERROR"
+
