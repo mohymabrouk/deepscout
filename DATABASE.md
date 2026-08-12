@@ -9,7 +9,7 @@ create table research_runs (
   id uuid primary key default gen_random_uuid(),
   user_id uuid null,
   anonymous_key text null,
-  question text not null,
+  question text null,
   status text not null,
   stage text null,
   report jsonb null,
@@ -67,9 +67,10 @@ create table sources (
 create table evidence_passages (
   id uuid primary key default gen_random_uuid(),
   run_id uuid not null references research_runs(id) on delete cascade,
-  source_id uuid not null references sources(id) on delete cascade,
+  source_id uuid null references sources(id) on delete set null,
+  citation_id integer not null,
   excerpt text not null,
-  relevance_score real null,
+  relevance_score real not null default 0,
   created_at timestamptz not null default now()
 );
 ```
@@ -102,6 +103,7 @@ create table usage_daily (
   input_tokens bigint not null default 0,
   output_tokens bigint not null default 0,
   search_calls integer not null default 0,
+  active_runs integer not null default 0,
   primary key(identity_key, usage_date)
 );
 ```
@@ -118,7 +120,23 @@ create table idempotency_keys (
 );
 ```
 
-## 7. Row-level security
+## 7. `request_rate_windows`
+
+Atomic fixed-window request counters used when the API runs with Postgres and multiple
+workers.
+
+## 8. `user_documents`
+
+Owner-scoped PDF metadata and bounded extracted text. Documents are referenced by ID in
+`POST /v1/research`; callers cannot attach another user's document.
+
+## 9. Retention functions
+
+`delete_expired_research_runs(interval)` and `delete_expired_documents(interval)` are
+explicit scheduler-facing functions. They do not run automatically at API startup.
+```
+
+## 10. Row-level security
 
 If exposing Supabase directly to the frontend for history reads:
 
@@ -133,9 +151,11 @@ predicates and the browser never connects with a service-role credential. Apply
 streams, metrics JSON, idempotency storage, and the stable history cursor index.
 
 Apply `infra/sql/003_source_quality.sql` after the Phase 5 migration to add the persisted
-quality score, bounded label, and explainable reason list.
+quality score, bounded label, and explainable reason list. Apply migrations 004–006 for
+atomic operational counters, evidence/retention functions, idempotency privacy metadata,
+and owner-scoped PDF documents.
 
-## 8. Retention
+## 11. Retention
 
 Suggested demo retention:
 

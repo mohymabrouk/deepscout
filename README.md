@@ -35,6 +35,7 @@ The MVP is intentionally narrow: reliable research runs, clean UX, strict cost c
 - Token budgets per run and per day
 - Provider fallback support
 - Run history for authenticated users
+- Bounded PDF upload and evidence extraction
 - Basic eval suite
 - Structured logs and traces
 - Zero/near-zero-cost deployment profile
@@ -45,7 +46,7 @@ The MVP is intentionally narrow: reliable research runs, clean UX, strict cost c
 - Autonomous purchasing/actions
 - Long-running background jobs
 - Multi-agent swarms
-- Arbitrary file upload RAG
+- Arbitrary multi-file/vector RAG
 - Team workspaces
 - Billing
 - Self-hosted model serving
@@ -131,18 +132,24 @@ cd apps/web && npm run lint && npm run typecheck && npm run build && npm audit
 ```
 
 The API uses an in-memory repository for local/demo execution and automatically selects
-the Postgres repository when `DATABASE_URL` is configured. Apply `infra/sql/001_initial.sql`
-and `infra/sql/002_phase5_auth_history.sql`, then `infra/sql/003_source_quality.sql`, to a
+the Postgres repository when `DATABASE_URL` is configured. Apply
+`infra/sql/001_initial.sql` through `infra/sql/006_pdf_documents.sql`, in order, to a
 managed Postgres database. To enable
 authenticated history, set `ENABLE_AUTH=true`, `SUPABASE_URL`, `SUPABASE_JWT_SECRET`, and
-`SUPABASE_JWT_AUDIENCE=authenticated` in the API environment. Copy the public Supabase URL
+`SUPABASE_JWT_AUDIENCE=authenticated` in the API environment. For projects using asymmetric
+Supabase signing keys, set `SUPABASE_JWT_JWKS_URL` instead of the legacy JWT secret. Copy the public Supabase URL
 and anon key into `apps/web/.env.local` as `NEXT_PUBLIC_SUPABASE_URL` and
 `NEXT_PUBLIC_SUPABASE_ANON_KEY`.
 
 Authenticated users can revisit runs at `/history`. Result, event, list, and delete
 operations are owner-scoped; anonymous runs remain bound to their anonymous identity.
 Completed reports also expose deterministic source-quality signals with bounded labels and
-reasons. Treat them as review aids, not proof that a source is correct.
+reasons. Treat them as review aids, not proof that a source is correct. The composer accepts
+one bounded PDF attachment; its extracted text is owner-scoped and can be cited in the run.
+
+When `STORE_QUESTION_TEXT=false` (the default), the original question is not persisted in
+the database; the active worker still receives it for the duration of the run. `/v1/usage`
+is disabled unless `ENABLE_DEBUG_USAGE=true`.
 
 ## Deterministic benchmark
 

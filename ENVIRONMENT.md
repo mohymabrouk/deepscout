@@ -1,6 +1,7 @@
 # Environment Variables
 
-Use this as the basis for `.env.example`.
+Use `.env.example` as the canonical template. The API reads `.env` from the repository
+working directory; the frontend reads `apps/web/.env.local`.
 
 ```dotenv
 # App
@@ -9,16 +10,23 @@ APP_VERSION=0.1.0
 FRONTEND_ORIGIN=http://localhost:3000
 API_PUBLIC_URL=http://localhost:8000
 
-# Database
+# Database / Supabase Auth
 DATABASE_URL=
 SUPABASE_URL=
 SUPABASE_ANON_KEY=
 SUPABASE_SERVICE_ROLE_KEY=
+SUPABASE_JWT_SECRET=
+SUPABASE_JWT_JWKS_URL=
+SUPABASE_JWT_AUDIENCE=authenticated
+
+# Frontend-safe Supabase Auth settings
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
 
 # LLM primary
-LLM_PROVIDER=groq
+LLM_PROVIDER=demo
 LLM_API_KEY=
-LLM_MODEL=
+LLM_MODEL=demo
 LLM_TIMEOUT_SECONDS=25
 
 # LLM fallback
@@ -28,7 +36,7 @@ LLM_FALLBACK_API_KEY=
 LLM_FALLBACK_MODEL=
 
 # Search
-SEARCH_PROVIDER=
+SEARCH_PROVIDER=demo
 SEARCH_API_KEY=
 SEARCH_TIMEOUT_SECONDS=10
 
@@ -54,10 +62,14 @@ MAX_TOTAL_CONTEXT_CHARS=50000
 MAX_LLM_CALLS_PER_RUN=3
 MAX_INPUT_TOKENS_PER_RUN=18000
 MAX_OUTPUT_TOKENS_PER_RUN=2500
+MAX_REQUEST_BYTES=64000
+MAX_DOCUMENT_BYTES=10000000
+MAX_DOCUMENT_PAGES=50
+MAX_DOCUMENT_CHARS=100000
+MAX_DOCUMENTS_PER_RUN=3
 
 # Logging
 LOG_LEVEL=INFO
-LOG_FORMAT=json
 STORE_QUESTION_TEXT=false
 
 # Feature flags
@@ -71,6 +83,9 @@ ENABLE_DEBUG_USAGE=false
 
 - `.env` files are ignored by Git.
 - `.env.example` contains no real keys.
+- leave both providers set to `demo` for a complete local run without paid services.
+- set `LLM_PROVIDER=groq` or `openrouter` and `SEARCH_PROVIDER=brave` only after adding keys.
+- never put `SUPABASE_SERVICE_ROLE_KEY`, provider keys, JWT secrets, or HMAC secrets in the frontend environment.
 - production secrets are configured in hosting dashboards.
 - fallback provider can be disabled without code changes.
 - all quotas can be reduced immediately if abuse appears.

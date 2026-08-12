@@ -38,13 +38,16 @@ Start command:
 uvicorn app.main:app --host 0.0.0.0 --port $PORT
 ```
 
-Environment:
+Environment (backend):
 
 ```text
 APP_ENV=production
 DATABASE_URL=...
 SUPABASE_URL=...
 SUPABASE_SERVICE_ROLE_KEY=...
+SUPABASE_JWT_SECRET=... # legacy HS256 only; omit when using JWKS
+SUPABASE_JWT_JWKS_URL=... # usually <SUPABASE_URL>/auth/v1/.well-known/jwks.json
+SUPABASE_JWT_AUDIENCE=authenticated
 LLM_PROVIDER=groq
 LLM_API_KEY=...
 LLM_MODEL=...
@@ -71,13 +74,16 @@ Cold start is acceptable for a portfolio demo if UX communicates it.
 
 ## 5. Migrations
 
-Use Alembic or SQL migration files.
+Use the checked-in SQL migration files.
 
 Deployment rule:
 
 - migrations run explicitly, not at every app boot;
 - destructive migrations require backup/confirmation;
 - schema version is logged on startup.
+
+Apply `infra/sql/001_initial.sql` through `infra/sql/006_pdf_documents.sql` in order
+before setting `DATABASE_URL` on the API service.
 
 ## 6. CI/CD
 
