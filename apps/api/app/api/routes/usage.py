@@ -2,6 +2,7 @@ from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Request
 
+from app.core.errors import FEATURE_DISABLED, DomainError
 from app.schemas.research import UsageResponse
 
 router = APIRouter(prefix="/v1", tags=["usage"])
@@ -9,6 +10,8 @@ router = APIRouter(prefix="/v1", tags=["usage"])
 
 @router.get("/usage", response_model=UsageResponse)
 async def usage(request: Request) -> UsageResponse:
+    if not request.app.state.settings.enable_debug_usage:
+        raise DomainError(FEATURE_DISABLED, "Usage diagnostics are disabled.", 404)
     identity = request.state.identity_key
     authenticated = request.state.authenticated
     current = await request.app.state.quota_service.get(identity)

@@ -49,22 +49,34 @@ def authenticate_request(authorization: str | None, settings: Settings) -> AuthU
         raise DomainError(UNAUTHORIZED, "Authentication is required or the token is invalid.", 401)
     if not settings.enable_auth:
         raise DomainError(AUTH_NOT_CONFIGURED, "Authentication is not enabled for this API.", 503)
-    if not settings.supabase_jwt_secret:
-        raise DomainError(AUTH_NOT_CONFIGURED, "Authentication is not configured for this API.", 503)
+    jwks_url = settings.supabase_jwt_jwks_url
+    if not settings.supabase_jwt_secret and not jwks_url:
+        if settings.supabase_url:
+            jwks_url = f"{settings.supabase_url.rstrip('/')}/auth/v1/.well-known/jwks.json"
+        else:
+            raise DomainError(AUTH_NOT_CONFIGURED, "Authentication is not configured for this API.", 503)
 
     issuer = None
     if settings.supabase_url:
         issuer = f"{settings.supabase_url.rstrip('/')}/auth/v1"
     try:
-        decode_kwargs = {
-            "algorithms": ["HS256"],
-            "audience": settings.supabase_jwt_audience,
-        }
+        decode_kwargs = {"audience": settings.supabase_jwt_audience}
         if issuer:
             decode_kwargs["issuer"] = issuer
-        claims = jwt.decode(token.strip(), settings.supabase_jwt_secret, **decode_kwargs)
+        if settings.supabase_jwt_secret:
+            claims = jwt.decode(
+                token.strip(), settings.supabase_jwt_secret, algorithms=["HS256"], **decode_kwargs
+            )
+        else:
+            signing_key = jwt.PyJWKClient(jwks_url).get_signing_key_from_jwt(token.strip())
+            claims = jwt.decode(
+                token.strip(),
+                signing_key.key,
+                algorithms=["RS256", "ES256", "EdDSA"],
+                **decode_kwargs,
+            )
         user_id = str(UUID(str(claims.get("sub", ""))))
-    except (jwt.InvalidTokenError, ValueError, TypeError):
+    except (jwt.InvalidTokenError, ValueError, TypeError, OSError):
         raise DomainError(UNAUTHORIZED, "Authentication is required or the token is invalid.", 401) from None
 
     if claims.get("role") != "authenticated":

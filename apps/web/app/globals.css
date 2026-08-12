@@ -12,6 +12,9 @@
 body { margin: 0; background: var(--background); color: var(--ink); font-family: Arial, Helvetica, sans-serif; }
 a { color: inherit; }
 button, textarea { font: inherit; }
+.sr-only { clip: rect(0 0 0 0); clip-path: inset(50%); height: 1px; overflow: hidden; position: absolute; white-space: nowrap; width: 1px; }
+.document-picker { align-items: center; color: var(--muted); display: flex; font-size: 13px; gap: 10px; margin-top: 12px; }
+.document-picker input { max-width: 210px; }
 .shell { margin: 0 auto; max-width: 1120px; padding: 0 24px 80px; }
 .header { align-items: center; border-bottom: 1px solid var(--border); display: flex; height: 64px; justify-content: space-between; }
 .header-actions { align-items: center; display: flex; gap: 18px; }

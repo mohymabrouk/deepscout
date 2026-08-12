@@ -28,7 +28,7 @@ export default function ReportView({ report, sources }: { report: Report; source
                 {paragraph.citations.map((citation) => {
                   const source = sourceById.get(citation);
                   if (!source) return null;
-                  return <button className="citation" type="button" key={citation} title={`${source.title} · ${source.domain}`} onClick={() => focusSource(citation)}>[{citation}]</button>;
+                  return <button className="citation" type="button" key={citation} aria-label={`View source ${citation}: ${source.title}`} title={`${source.title} · ${source.domain}`} onClick={() => focusSource(citation)}>[{citation}]</button>;
                 })}
               </p>
             ))}
@@ -42,7 +42,7 @@ export default function ReportView({ report, sources }: { report: Report; source
           <p className="quality-disclaimer">Quality labels are explainable signals, not a guarantee that a source is correct.</p>
           {sources.map((source) => {
             const quality = source.quality ?? { score: 0.5, label: "medium" as const, reasons: ["Quality signals were not available."] };
-            return <a className={`source-card${highlightedSource === source.citation_id ? " highlighted" : ""}`} id={`source-${source.citation_id}`} href={source.url} target="_blank" rel="noopener noreferrer" key={source.citation_id}>
+            return <a className={`source-card${highlightedSource === source.citation_id ? " highlighted" : ""}`} id={`source-${source.citation_id}`} href={source.url} target="_blank" rel="noopener noreferrer" aria-label={`Source ${source.citation_id}: ${source.title}`} key={source.citation_id}>
             <span className="source-number">{source.citation_id}</span>
             <span><strong>{source.title}</strong><small>{source.domain}</small><span className={`quality-badge quality-${quality.label}`} title={quality.reasons.join(" ")}>{quality.label} signal · {Math.round(quality.score * 100)}%</span></span>
           </a>;

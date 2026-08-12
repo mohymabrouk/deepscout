@@ -5,4 +5,6 @@ pydantic-settings>=2.3,<3
 PyJWT>=2.8,<3
 asyncpg>=0.29,<1
 beautifulsoup4>=4.12,<5
+pypdf>=5,<7
+python-multipart>=0.0.9,<1
 uvicorn[standard]>=0.30,<1

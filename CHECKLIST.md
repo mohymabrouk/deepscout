@@ -8,7 +8,7 @@ The checked implementation items below run locally against deterministic demo pr
 
 - [x] Create `apps/web`
 - [x] Create `apps/api`
-- [ ] Add root README
+- [x] Add root README
 - [x] Add `.env.example`
 - [x] Add CI
 - [ ] Protect `main` branch if desired
@@ -34,7 +34,7 @@ The checked implementation items below run locally against deterministic demo pr
 - [x] Citation verifier
 - [x] Research orchestrator
 - [x] Run persistence (Postgres repository with local in-memory fallback)
-- [ ] Usage persistence (in-memory MVP only)
+- [x] Usage persistence (atomic Postgres counters with local fallback)
 - [x] SSE events
 
 ## Frontend
@@ -49,7 +49,7 @@ The checked implementation items below run locally against deterministic demo pr
 - [x] Inline citations
 - [x] Source rail/cards
 - [x] Responsive layout
-- [ ] Accessibility pass (baseline semantics present; full audit remains)
+- [x] Accessibility pass (labels, live status, keyboard focus)
 - [x] Supabase Auth sign-in/sign-up/sign-out
 - [x] History page
 
@@ -69,40 +69,42 @@ The checked implementation items below run locally against deterministic demo pr
 - [x] Persisted quality score, label, and reasons
 - [x] Quality signals rendered beside source cards
 - [x] Quality classifier unit and pipeline tests
+- [x] Bounded PDF upload and text extraction
+- [x] Owner-scoped PDF evidence attached to research runs
 
 ## Database
 
-- [ ] `research_runs`
-- [ ] `sources`
-- [ ] `evidence_passages`
+- [x] `research_runs`
+- [x] `sources`
+- [x] `evidence_passages`
 - [x] `run_events`
-- [ ] `usage_daily`
+- [x] `usage_daily`
 - [x] indexes
-- [ ] retention policy
+- [x] retention policy functions
 - [x] ownership policy in FastAPI repository queries (RLS remains optional because the API is the DB boundary)
 
 ## Security
 
-- [ ] Secrets backend-only
-- [ ] SSRF private-IP block
-- [ ] Redirect revalidation
-- [ ] Body-size caps
-- [ ] HTML escaping
-- [ ] Unsafe Markdown HTML disabled
+- [x] Secrets backend-only
+- [x] SSRF private-IP block
+- [x] Redirect revalidation
+- [x] Body-size caps
+- [x] HTML escaping
+- [x] Unsafe Markdown HTML disabled (reports render structured text, never model HTML)
 - [x] Auth JWT validation
-- [ ] Log redaction
-- [ ] Dependency audit
+- [x] Log redaction
+- [x] Dependency audit (CI)
 
 ## Reliability
 
-- [ ] Provider timeout
-- [ ] Search timeout
-- [ ] Fetch timeout
-- [ ] Retry caps
-- [ ] Circuit/fallback logic
-- [ ] Concurrency semaphore
-- [ ] Idempotency handling
-- [ ] Run hard timeout
+- [x] Provider timeout
+- [x] Search timeout
+- [x] Fetch timeout
+- [x] Retry caps
+- [x] Fallback logic
+- [x] Concurrency semaphore
+- [x] Idempotency handling
+- [x] Run hard timeout
 
 ## Evals
 
@@ -117,6 +119,9 @@ The checked implementation items below run locally against deterministic demo pr
 - [x] CI regression gate
 
 ## Deployment
+
+The following require the operator's hosting accounts, keys, domain, and production
+environment; they cannot be completed from this repository alone.
 
 - [ ] Frontend live
 - [ ] API live

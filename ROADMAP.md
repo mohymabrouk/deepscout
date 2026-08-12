@@ -11,7 +11,8 @@ Phases 1 through 6 are implemented in the local MVP:
 - `infra/sql/001_initial.sql` and the Phase 5 migration are prepared for managed Postgres deployment.
 - Phase 3 UX: live stage telemetry, loading skeletons, responsive report/source layout, citation highlighting/tooltips, keyboard shortcuts, reduced-motion support, automatic dark mode, and share-link copying;
 - Phase 4 evals: 32 curated cases, deterministic citation/retrieval/latency/token metrics, checked-in baseline, CI regression gate, and a measured evidence-coverage improvement.
-- Phase 6 source-quality classifier: deterministic bounded scores, explainable reasons, Postgres persistence, and source-rail UI signals with an explicit heuristic disclaimer.
+- Phase 6 source-quality classifier: deterministic bounded scores, explainable reasons, Postgres persistence, and source-rail UI signals with an explicit heuristic disclaimer;
+- bounded PDF ingestion: owner-scoped upload, page/text/byte caps, extracted-text persistence, and cited PDF evidence in research runs.
 
 The default local repository remains single-process in-memory so the MVP runs without infrastructure. When `DATABASE_URL` is configured, the API uses the Postgres repository; Supabase Auth and owner-scoped history are implemented, while deployment configuration remains environment-specific.
 
@@ -111,6 +112,6 @@ Choose only one or two:
 
 Do not add multi-agent orchestration unless it produces a measurable gain.
 
-Status: source-quality classifier implemented. The classifier is deliberately heuristic
-and explainable; it signals observable source characteristics without claiming factual
-authority.
+Status: source-quality classifier and PDF ingestion implemented. The classifier is
+deliberately heuristic and explainable; it signals observable source characteristics
+without claiming factual authority. PDF extraction is bounded text extraction, not OCR.

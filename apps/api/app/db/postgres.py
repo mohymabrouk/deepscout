@@ -6,8 +6,9 @@ from datetime import datetime
 from typing import Any
 from uuid import UUID, uuid4
 
-from app.db.repository import RunRecord
-from app.research.models import RunMetrics, StageTiming
+from app.core.errors import IDEMPOTENCY_CONFLICT, DomainError
+from app.db.repository import DocumentRecord, RunRecord
+from app.research.models import EvidencePassage, RunMetrics, StageTiming
 from app.schemas.events import RunEvent
 from app.schemas.research import ResearchReport, Source, SourceQuality, Usage
 
@@ -39,6 +40,120 @@ class PostgresRunRepository:
         if self._pool is not None:
             await self._pool.close()
             self._pool = None
+
+    async def ready(self) -> bool:
+        pool = await self._get_pool()
+        async with pool.acquire() as connection:
+            await connection.fetchval("select 1")
+        return True
+
+    async def recover_incomplete_runs(self) -> None:
+        pool = await self._get_pool()
+        async with pool.acquire() as connection:
+            async with connection.transaction():
+                rows = await connection.fetch(
+                    """
+                    update research_runs
+                    set status = 'failed', stage = 'failed',
+                        error_code = 'API_RESTARTED', completed_at = now()
+                    where status not in ('completed', 'failed', 'limited')
+                    returning id
+                    """
+                )
+                if rows:
+                    await connection.executemany(
+                        """
+                        insert into run_events (run_id, event_type, payload)
+                        values ($1, 'error', $2::jsonb)
+                        """,
+                        [(row["id"], '{"code":"API_RESTARTED"}') for row in rows],
+                    )
+
+    async def create_document(
+        self,
+        filename: str,
+        extracted_text: str,
+        page_count: int,
+        content_hash: str,
+        identity_key: str,
+        user_id: str | None = None,
+    ) -> DocumentRecord:
+        pool = await self._get_pool()
+        document_id = uuid4()
+        async with pool.acquire() as connection:
+            row = await connection.fetchrow(
+                """
+                insert into user_documents
+                    (id, user_id, anonymous_key, filename, extracted_text, page_count, content_hash)
+                values ($1, $2, $3, $4, $5, $6, $7)
+                returning *
+                """,
+                document_id,
+                UUID(user_id) if user_id else None,
+                identity_key if user_id is None else None,
+                filename,
+                extracted_text,
+                page_count,
+                content_hash,
+            )
+        return DocumentRecord(
+            id=str(row["id"]),
+            filename=row["filename"],
+            extracted_text=row["extracted_text"],
+            page_count=row["page_count"],
+            content_hash=row["content_hash"],
+            identity_key=row["anonymous_key"] or "",
+            user_id=str(row["user_id"]) if row["user_id"] else None,
+            created_at=row["created_at"],
+        )
+
+    async def get_owned_documents(
+        self, document_ids: list[str], identity_key: str, user_id: str | None
+    ) -> list[DocumentRecord]:
+        if not document_ids:
+            return []
+        parsed_ids: list[UUID] = []
+        try:
+            parsed_ids = [UUID(document_id) for document_id in document_ids]
+        except ValueError:
+            return []
+        pool = await self._get_pool()
+        async with pool.acquire() as connection:
+            if user_id:
+                rows = await connection.fetch(
+                    """
+                    select * from user_documents
+                    where id = any($1::uuid[]) and user_id = $2
+                    order by array_position($1::uuid[], id)
+                    """,
+                    parsed_ids,
+                    UUID(user_id),
+                )
+            else:
+                rows = await connection.fetch(
+                    """
+                    select * from user_documents
+                    where id = any($1::uuid[]) and user_id is null and anonymous_key = $2
+                    order by array_position($1::uuid[], id)
+                    """,
+                    parsed_ids,
+                    identity_key,
+                )
+        if len(rows) != len(parsed_ids):
+            return []
+        return [
+            DocumentRecord(
+                id=str(row["id"]),
+                filename=row["filename"],
+                extracted_text=row["extracted_text"],
+                page_count=row["page_count"],
+                content_hash=row["content_hash"],
+                identity_key=row["anonymous_key"] or "",
+                user_id=str(row["user_id"]) if row["user_id"] else None,
+                created_at=row["created_at"],
+            )
+            for row in rows
+        ]
 
     @staticmethod
     def _run_uuid(run_id: str) -> UUID | None:
@@ -215,7 +330,12 @@ class PostgresRunRepository:
             )
 
     async def complete(
-        self, run_id: str, report: ResearchReport, sources: list[Source], usage: Usage
+        self,
+        run_id: str,
+        report: ResearchReport,
+        sources: list[Source],
+        usage: Usage,
+        evidence: list[EvidencePassage] | None = None,
     ) -> None:
         pool = await self._get_pool()
         async with pool.acquire() as connection:
@@ -257,6 +377,34 @@ class PostgresRunRepository:
                         for source in sources
                     ],
                 )
+                await connection.execute(
+                    "delete from evidence_passages where run_id = $1", UUID(run_id)
+                )
+                if evidence:
+                    source_rows = await connection.fetch(
+                        "select id, citation_id from sources where run_id = $1",
+                        UUID(run_id),
+                    )
+                    source_ids = {
+                        row["citation_id"]: row["id"] for row in source_rows
+                    }
+                    await connection.executemany(
+                        """
+                        insert into evidence_passages
+                            (run_id, source_id, citation_id, excerpt, relevance_score)
+                        values ($1, $2, $3, $4, $5)
+                        """,
+                        [
+                            (
+                                UUID(run_id),
+                                source_ids.get(citation_id),
+                                citation_id,
+                                item.excerpt,
+                                item.relevance_score,
+                            )
+                            for citation_id, item in enumerate(evidence, start=1)
+                        ],
+                    )
 
     async def increment_search_calls(self, run_id: str) -> None:
         pool = await self._get_pool()
@@ -418,3 +566,66 @@ class PostgresRunRepository:
                 idempotency_key,
                 UUID(run_id),
             )
+
+    async def get_or_create_idempotent(
+        self,
+        question: str | None,
+        identity_key: str,
+        user_id: str | None,
+        idempotency_key: str,
+        request_hash: str,
+    ) -> tuple[RunRecord, bool]:
+        pool = await self._get_pool()
+        async with pool.acquire() as connection:
+            async with connection.transaction():
+                run_id = uuid4()
+                row = await connection.fetchrow(
+                    """
+                    insert into research_runs (id, user_id, anonymous_key, question, status)
+                    values ($1, $2, $3, $4, 'pending')
+                    on conflict do nothing
+                    returning *, 0::integer as source_count
+                    """,
+                    run_id,
+                    UUID(user_id) if user_id else None,
+                    identity_key if user_id is None else None,
+                    question,
+                )
+                if row is not None:
+                    claimed = await connection.fetchrow(
+                        """
+                        insert into idempotency_keys
+                            (identity_key, idempotency_key, run_id, request_hash)
+                        values ($1, $2, $3, $4)
+                        on conflict (identity_key, idempotency_key) do nothing
+                        returning run_id
+                        """,
+                        identity_key,
+                        idempotency_key,
+                        run_id,
+                        request_hash,
+                    )
+                    if claimed is not None:
+                        return self._record(row), True
+                    await connection.execute(
+                        "delete from research_runs where id = $1", run_id
+                    )
+                existing = await connection.fetchrow(
+                    """
+                    select r.*, 0::integer as source_count, i.request_hash
+                    from idempotency_keys i
+                    join research_runs r on r.id = i.run_id
+                    where i.identity_key = $1 and i.idempotency_key = $2
+                    """,
+                    identity_key,
+                    idempotency_key,
+                )
+                if existing is None:
+                    raise RuntimeError("Idempotency claim disappeared during transaction")
+                if existing["request_hash"] and existing["request_hash"] != request_hash:
+                    raise DomainError(
+                        IDEMPOTENCY_CONFLICT,
+                        "The idempotency key was already used for a different request.",
+                        409,
+                    )
+                return self._record(existing), False

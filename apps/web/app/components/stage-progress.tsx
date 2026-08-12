@@ -15,7 +15,7 @@ export default function StageProgress({ stage, data }: { stage: string; data: Re
   const currentIndex = stages.findIndex((item) => item.key === stage);
   const safeIndex = currentIndex < 0 ? 0 : currentIndex;
   return (
-    <div className="progress" role="list" aria-label="Research progress">
+    <div className="progress" role="list" aria-label="Research progress" aria-live="polite">
       {stages.map((item, index) => {
         const complete = index < safeIndex;
         const current = item.key === stage;
@@ -35,4 +35,3 @@ export default function StageProgress({ stage, data }: { stage: string; data: Re
     </div>
   );
 }
-

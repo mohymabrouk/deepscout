@@ -49,9 +49,16 @@ Authorization: Bearer <optional Supabase JWT>
 Idempotency-Key: <optional uuid>
 ```
 
-When enabled, the API accepts only a Supabase access token signed with the configured
-JWT secret, issuer/audience, expiry, UUID subject, and `role=authenticated`. The server
+When enabled, the API accepts only a Supabase access token verified with the configured
+legacy JWT secret or Supabase JWKS signing key, issuer/audience, expiry, UUID subject, and
+`role=authenticated`. The server
 derives ownership from the token `sub` claim; request bodies never select a user.
+
+Optional request field:
+
+```json
+{"document_ids": ["<owner-scoped-document-id>"]}
+```
 
 Success: `202 Accepted`
 
@@ -63,7 +70,19 @@ Success: `202 Accepted`
 }
 ```
 
-## 4. `GET /v1/research/{run_id}/events`
+## 4. `POST /v1/documents`
+
+Multipart upload field: `file`. The file must be a PDF within `MAX_DOCUMENT_BYTES`,
+`MAX_DOCUMENT_PAGES`, and `MAX_DOCUMENT_CHARS`. The extracted text is stored under the
+verified owner or anonymous HMAC identity and can be attached to a research request.
+
+Success: `201 Created`
+
+```json
+{"id":"<uuid>","filename":"notes.pdf","page_count":4,"character_count":18200}
+```
+
+## 5. `GET /v1/research/{run_id}/events`
 
 SSE event examples:
 
@@ -80,7 +99,7 @@ data: {"run_id":"run_01...","status":"completed"}
 
 No chain-of-thought or raw prompt content is emitted.
 
-## 5. `GET /v1/research/{run_id}`
+## 6. `GET /v1/research/{run_id}`
 
 Response:
 
@@ -123,7 +142,7 @@ Usage may be hidden from normal users and visible only in debug/admin mode.
 response status, extractable text, and title/language cues. It is not a factual-truth
 guarantee or an endorsement of the publisher.
 
-## 6. `GET /v1/runs`
+## 7. `GET /v1/runs`
 
 Authenticated only.
 
@@ -136,13 +155,13 @@ cursor=<opaque>
 
 Returns compact run metadata, not all source text.
 
-## 7. `DELETE /v1/runs/{run_id}`
+## 8. `DELETE /v1/runs/{run_id}`
 
 Authenticated or anonymous owner only. Deletes the run and its sources/events through
 the database foreign-key cascade. A run owned by another user is indistinguishable from
 a missing run and returns `404`.
 
-## 8. `GET /v1/usage`
+## 9. `GET /v1/usage`
 
 Response:
 
@@ -157,7 +176,7 @@ Response:
 }
 ```
 
-## 8. Error format
+## 10. Error format
 
 All domain errors use:
 
@@ -187,6 +206,10 @@ SEARCH_UNAVAILABLE
 INSUFFICIENT_SOURCES
 RUN_TIMEOUT
 RUN_NOT_FOUND
+DOCUMENT_NOT_FOUND
+DOCUMENT_TOO_LARGE
+INVALID_DOCUMENT
+IDEMPOTENCY_CONFLICT
 UNAUTHORIZED
 INTERNAL_ERROR
 ```

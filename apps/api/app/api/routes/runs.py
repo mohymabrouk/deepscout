@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Query, Request, Response, status
 
-from app.core.errors import RUN_NOT_FOUND, DomainError
+from app.core.errors import FEATURE_DISABLED, RUN_NOT_FOUND, DomainError
 from app.core.security import decode_cursor, encode_cursor
 from app.schemas.research import RunListResponse, RunSummary
 
@@ -27,6 +27,8 @@ async def list_runs(
     limit: int = Query(default=20, ge=1, le=100),
     cursor: str | None = Query(default=None),
 ) -> RunListResponse:
+    if not request.app.state.settings.enable_history:
+        raise DomainError(FEATURE_DISABLED, "Run history is disabled.", 404)
     user_id = request.state.user_id
     if user_id is None:
         raise DomainError("UNAUTHORIZED", "Sign in to access run history.", 401)
@@ -50,6 +52,8 @@ async def list_runs(
 
 @router.delete("/{run_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_run(request: Request, run_id: str) -> Response:
+    if not request.app.state.settings.enable_history:
+        raise DomainError(FEATURE_DISABLED, "Run history is disabled.", 404)
     deleted = await request.app.state.repository.delete_owned(
         run_id, request.state.identity_key, request.state.user_id
     )

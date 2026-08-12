@@ -12,7 +12,8 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from uuid import uuid4
 
-from app.research.models import RunMetrics, StageTiming
+from app.core.errors import IDEMPOTENCY_CONFLICT, DomainError
+from app.research.models import EvidencePassage, RunMetrics, StageTiming
 from app.schemas.events import RunEvent
 from app.schemas.research import ResearchReport, Source, Usage
 
@@ -22,7 +23,7 @@ TERMINAL_STATUSES = {"completed", "failed", "limited"}
 @dataclass
 class RunRecord:
     id: str
-    question: str
+    question: str | None
     identity_key: str
     user_id: str | None = None
     status: str = "pending"
@@ -34,6 +35,7 @@ class RunRecord:
     search_calls: int = 0
     error_code: str | None = None
     events: list[RunEvent] = field(default_factory=list)
+    evidence_passages: list[EvidencePassage] = field(default_factory=list)
     created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     metrics: RunMetrics = field(init=False)
 
@@ -41,10 +43,23 @@ class RunRecord:
         self.metrics = RunMetrics(started_at=self.created_at)
 
 
+@dataclass(frozen=True)
+class DocumentRecord:
+    id: str
+    filename: str
+    extracted_text: str
+    page_count: int
+    content_hash: str
+    identity_key: str
+    user_id: str | None = None
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+
+
 class InMemoryRunRepository:
     def __init__(self) -> None:
         self._runs: dict[str, RunRecord] = {}
-        self._idempotency: dict[tuple[str, str], str] = {}
+        self._documents: dict[str, DocumentRecord] = {}
+        self._idempotency: dict[tuple[str, str], tuple[str, str]] = {}
         self._lock = asyncio.Lock()
 
     async def create(
@@ -85,7 +100,12 @@ class InMemoryRunRepository:
             self._runs[run_id].events.append(event)
 
     async def complete(
-        self, run_id: str, report: ResearchReport, sources: list[Source], usage: Usage
+        self,
+        run_id: str,
+        report: ResearchReport,
+        sources: list[Source],
+        usage: Usage,
+        evidence: list[EvidencePassage] | None = None,
     ) -> None:
         async with self._lock:
             run = self._runs[run_id]
@@ -95,6 +115,7 @@ class InMemoryRunRepository:
             run.source_count = len(sources)
             run.title = report.title
             run.usage = usage
+            run.evidence_passages = list(evidence or [])
 
     async def increment_search_calls(self, run_id: str) -> None:
         async with self._lock:
@@ -174,10 +195,93 @@ class InMemoryRunRepository:
 
     async def get_idempotency(self, identity_key: str, idempotency_key: str) -> str | None:
         async with self._lock:
-            return self._idempotency.get((identity_key, idempotency_key))
+            item = self._idempotency.get((identity_key, idempotency_key))
+            return item[0] if item else None
 
     async def save_idempotency(
         self, identity_key: str, idempotency_key: str, run_id: str
     ) -> None:
         async with self._lock:
-            self._idempotency.setdefault((identity_key, idempotency_key), run_id)
+            self._idempotency.setdefault((identity_key, idempotency_key), (run_id, ""))
+
+    async def get_or_create_idempotent(
+        self,
+        question: str | None,
+        identity_key: str,
+        user_id: str | None,
+        idempotency_key: str,
+        request_hash: str,
+    ) -> tuple[RunRecord, bool]:
+        async with self._lock:
+            key = (identity_key, idempotency_key)
+            existing = self._idempotency.get(key)
+            if existing is not None:
+                existing_run_id, existing_hash = existing
+                if existing_hash and existing_hash != request_hash:
+                    raise DomainError(
+                        IDEMPOTENCY_CONFLICT,
+                        "The idempotency key was already used for a different request.",
+                        409,
+                    )
+                record = self._runs.get(existing_run_id)
+                if record is not None:
+                    return record, False
+                self._idempotency.pop(key, None)
+            record = RunRecord(
+                id=str(uuid4()),
+                question=question,
+                identity_key=identity_key,
+                user_id=user_id,
+            )
+            self._runs[record.id] = record
+            self._idempotency[key] = (record.id, request_hash)
+            return record, True
+
+    async def ready(self) -> bool:
+        return True
+
+    async def create_document(
+        self,
+        filename: str,
+        extracted_text: str,
+        page_count: int,
+        content_hash: str,
+        identity_key: str,
+        user_id: str | None = None,
+    ) -> DocumentRecord:
+        document = DocumentRecord(
+            id=str(uuid4()),
+            filename=filename,
+            extracted_text=extracted_text,
+            page_count=page_count,
+            content_hash=content_hash,
+            identity_key=identity_key,
+            user_id=user_id,
+        )
+        async with self._lock:
+            self._documents[document.id] = document
+        return document
+
+    async def get_owned_documents(
+        self, document_ids: list[str], identity_key: str, user_id: str | None
+    ) -> list[DocumentRecord]:
+        async with self._lock:
+            documents = [self._documents.get(document_id) for document_id in document_ids]
+            if any(document is None for document in documents):
+                return []
+            owned = [document for document in documents if document and self._owns_document(document, identity_key, user_id)]
+            return owned if len(owned) == len(document_ids) else []
+
+    @staticmethod
+    def _owns_document(document: DocumentRecord, identity_key: str, user_id: str | None) -> bool:
+        if user_id is not None:
+            return document.user_id == user_id
+        return document.user_id is None and document.identity_key == identity_key
+
+    async def recover_incomplete_runs(self) -> None:
+        async with self._lock:
+            for run in self._runs.values():
+                if run.status not in TERMINAL_STATUSES:
+                    run.status = "failed"
+                    run.error_code = "API_RESTARTED"
+                    run.events.append(RunEvent(event="error", data={"code": "API_RESTARTED"}))

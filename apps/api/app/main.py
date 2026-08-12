@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import asyncio
+import logging
 import uuid
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.encoders import jsonable_encoder
@@ -8,13 +11,19 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
+from app.api.routes.documents import router as documents_router
 from app.api.routes.health import router as health_router
 from app.api.routes.research import router as research_router
 from app.api.routes.runs import router as runs_router
 from app.api.routes.usage import router as usage_router
 from app.config import get_settings
-from app.core.errors import HTTP_RATE_LIMIT, DomainError
-from app.core.rate_limit import FixedWindowRateLimiter, RunQuotaService
+from app.core.errors import HTTP_RATE_LIMIT, INTERNAL_ERROR, DomainError
+from app.core.rate_limit import (
+    FixedWindowRateLimiter,
+    PostgresFixedWindowRateLimiter,
+    PostgresRunQuotaService,
+    RunQuotaService,
+)
 from app.core.security import anonymous_identity, authenticate_request, authenticated_identity
 from app.db.postgres import PostgresRunRepository
 from app.db.repository import InMemoryRunRepository
@@ -23,7 +32,26 @@ from app.research.orchestrator import ResearchOrchestrator
 
 def create_app() -> FastAPI:
     settings = get_settings()
-    app = FastAPI(title="DeepScout API", version=settings.app_version)
+    @asynccontextmanager
+    async def lifespan(app: FastAPI):
+        await app.state.repository.recover_incomplete_runs()
+        try:
+            yield
+        finally:
+            tasks = [task for task in app.state.tasks if not task.done()]
+            for task in tasks:
+                task.cancel()
+            if tasks:
+                await asyncio.gather(*tasks, return_exceptions=True)
+            close = getattr(app.state.repository, "close", None)
+            if close:
+                await close()
+            for service in (app.state.rate_limiter, app.state.quota_service):
+                close = getattr(service, "close", None)
+                if close:
+                    await close()
+
+    app = FastAPI(title="DeepScout API", version=settings.app_version, lifespan=lifespan)
     app.state.settings = settings
     app.state.repository = (
         PostgresRunRepository(settings.database_url)
@@ -33,8 +61,16 @@ def create_app() -> FastAPI:
     app.state.orchestrator = ResearchOrchestrator(settings, app.state.repository)
     app.state.tasks = set()
     app.state.run_tasks = {}
-    app.state.rate_limiter = FixedWindowRateLimiter()
-    app.state.quota_service = RunQuotaService()
+    app.state.rate_limiter = (
+        PostgresFixedWindowRateLimiter(settings.database_url)
+        if settings.database_url
+        else FixedWindowRateLimiter()
+    )
+    app.state.quota_service = (
+        PostgresRunQuotaService(settings.database_url)
+        if settings.database_url
+        else RunQuotaService()
+    )
     app.add_middleware(
         CORSMiddleware,
         allow_origins=[settings.frontend_origin],
@@ -46,6 +82,29 @@ def create_app() -> FastAPI:
     @app.middleware("http")
     async def add_request_id(request: Request, call_next):
         request.state.request_id = request.headers.get("X-Request-ID", f"req_{uuid.uuid4().hex}")
+        content_length = request.headers.get("content-length")
+        if content_length is not None:
+            try:
+                request_limit = (
+                    settings.max_document_bytes + 64_000
+                    if request.url.path == "/v1/documents"
+                    else settings.max_request_bytes
+                )
+                oversized = int(content_length) > request_limit
+            except ValueError:
+                oversized = True
+            if oversized:
+                return JSONResponse(
+                    status_code=413,
+                    content={
+                        "error": {
+                            "code": "REQUEST_TOO_LARGE",
+                            "message": "Request body exceeds the configured limit.",
+                            "request_id": request.state.request_id,
+                        }
+                    },
+                    headers={"X-Request-ID": request.state.request_id},
+                )
         if request.url.path.startswith("/v1"):
             raw_ip = request.client.host if request.client else "unknown"
             try:
@@ -86,6 +145,7 @@ def create_app() -> FastAPI:
         response = await call_next(request)
         response.headers["X-Request-ID"] = request.state.request_id
         response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
         if request.url.path.startswith("/v1"):
             response.headers["X-RateLimit-Limit"] = str(limit)
             response.headers["X-RateLimit-Remaining"] = str(remaining)
@@ -116,16 +176,31 @@ def create_app() -> FastAPI:
         )
         return response
 
+    @app.exception_handler(Exception)
+    async def unexpected_error_handler(request: Request, exc: Exception):
+        logging.getLogger("deepscout.api").exception(
+            "unhandled_request_error",
+            extra={
+                "request_id": getattr(request.state, "request_id", "unknown"),
+                "path": request.url.path,
+            },
+        )
+        return JSONResponse(
+            status_code=500,
+            content={
+                "error": {
+                    "code": INTERNAL_ERROR,
+                    "message": "The service could not complete the request.",
+                    "request_id": getattr(request.state, "request_id", "unknown"),
+                }
+            },
+        )
+
     app.include_router(health_router)
+    app.include_router(documents_router)
     app.include_router(research_router)
     app.include_router(runs_router)
     app.include_router(usage_router)
-
-    @app.on_event("shutdown")
-    async def close_repository() -> None:
-        close = getattr(app.state.repository, "close", None)
-        if close:
-            await close()
 
     return app
 

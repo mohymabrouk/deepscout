@@ -51,40 +51,52 @@ class SafeFetcher:
                 timeout=timeout, follow_redirects=False, headers=headers
             ) as client:
                 for _ in range(4):
-                    response = await client.get(current_url)
-                    if response.is_redirect:
-                        location = response.headers.get("location")
-                        if not location:
+                    async with client.stream("GET", current_url) as response:
+                        if response.is_redirect:
+                            location = response.headers.get("location")
+                            if not location:
+                                return None
+                            current_url = validate_fetch_url(urljoin(current_url, location))
+                            await self._assert_public_host(urlsplit(current_url).hostname or "")
+                            continue
+                        content_type = response.headers.get("content-type", "").split(";", 1)[0].lower()
+                        if response.status_code >= 400 or content_type not in ALLOWED_CONTENT_TYPES:
                             return None
-                        current_url = validate_fetch_url(urljoin(current_url, location))
-                        await self._assert_public_host(urlsplit(current_url).hostname or "")
-                        continue
-                    content_type = response.headers.get("content-type", "").split(";", 1)[0].lower()
-                    if response.status_code >= 400 or content_type not in ALLOWED_CONTENT_TYPES:
-                        return None
-                    body = response.content
-                    if len(body) > self.settings.max_fetch_bytes:
-                        return None
-                    if content_type == "text/plain":
-                        title, text = (
-                            result.title,
-                            body.decode(response.encoding or "utf-8", errors="replace"),
+                        declared_length = response.headers.get("content-length")
+                        if declared_length is not None:
+                            try:
+                                if int(declared_length) > self.settings.max_fetch_bytes:
+                                    return None
+                            except ValueError:
+                                return None
+                        chunks: list[bytes] = []
+                        total_bytes = 0
+                        async for chunk in response.aiter_bytes():
+                            total_bytes += len(chunk)
+                            if total_bytes > self.settings.max_fetch_bytes:
+                                return None
+                            chunks.append(chunk)
+                        body = b"".join(chunks)
+                        if content_type == "text/plain":
+                            title, text = (
+                                result.title,
+                                body.decode(response.encoding or "utf-8", errors="replace"),
+                            )
+                        else:
+                            title, text = self.extractor.extract(
+                                body.decode(response.encoding or "utf-8", errors="replace"),
+                                result.title,
+                            )
+                        if not text:
+                            return None
+                        return FetchedPage(
+                            current_url,
+                            title or result.title,
+                            text,
+                            urlsplit(current_url).hostname or result.domain,
+                            status_code=response.status_code,
+                            content_type=content_type,
                         )
-                    else:
-                        title, text = self.extractor.extract(
-                            body.decode(response.encoding or "utf-8", errors="replace"),
-                            result.title,
-                        )
-                    if not text:
-                        return None
-                    return FetchedPage(
-                        current_url,
-                        title or result.title,
-                        text,
-                        urlsplit(current_url).hostname or result.domain,
-                        status_code=response.status_code,
-                        content_type=content_type,
-                    )
         except (httpx.TimeoutException, httpx.NetworkError, UnicodeError):
             return None
         return None

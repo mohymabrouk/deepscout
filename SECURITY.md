@@ -92,7 +92,7 @@ Do not use `*` together with credentialed requests.
 If Supabase Auth is enabled:
 
 - validate JWT server-side;
-- verify HS256 signature, issuer, audience, expiry, UUID subject, and `role=authenticated`;
+- verify the legacy HS256 secret or Supabase JWKS signing key, issuer, audience, expiry, UUID subject, and `role=authenticated`;
 - derive `user_id` from validated token, never from request body;
 - anonymous mode remains a separate code path.
 

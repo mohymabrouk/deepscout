@@ -31,6 +31,7 @@ async def test_rate_limiter_allows_boundary_then_rejects():
 
 def test_usage_endpoint_and_rate_headers_are_structured():
     app = create_app()
+    app.state.settings.enable_debug_usage = True
     with TestClient(app) as client:
         response = client.get("/v1/usage")
         assert response.status_code == 200
